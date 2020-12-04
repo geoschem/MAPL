@@ -7453,6 +7453,7 @@ module MAPL_IOMod
     logical                            :: bootstrapable_
     logical                            :: isPresent
     character(len=:), allocatable      :: fname_by_face 
+    character(len=ESMF_MAXSTR)         :: dbgmsg
     ! get a list of variables in the file so we can skip if the 
     ! variable in the state is not in the file and it is bootstrapable
     ! will just let root do this since everybody will need it
@@ -7592,9 +7593,18 @@ module MAPL_IOMod
                else
                   if (bootStrapable_ .and. (RST == MAPL_RestartOptional)) then
                      call WRITE_PARALLEL("  Bootstrapping Variable: "//trim(FieldName)//" in "//trim(filename))
+                     IF (INDEX('FieldName', 'ADJ') /= 0) THEN
+
+                     call WRITE_PARALLEL("  Setting restart atr to : MAPL_RestartOptional")
+
+                     ! Set restart attr to indicate bootstrapped
+                     call ESMF_AttributeSet ( field, name='RESTART', &
+                             value=MAPL_RestartOptional, rc=status)
+                     else
+                     call WRITE_PARALLEL("  Setting restart atr to : MAPL_RestartBootstrap")
                      call ESMF_AttributeSet ( field, name='RESTART', &
                              value=MAPL_RestartBootstrap, rc=status)
-
+                     endif
                   else
                      _ASSERT(.false., "  Could not find field "//trim(FieldName)//" in "//trim(filename))
                   end if
@@ -7620,6 +7630,12 @@ module MAPL_IOMod
              else
                 RST = MAPL_RestartOptional
              end if
+   
+             if (MAPL_Am_I_Root()) THEN
+                WRITE(*, 1010) FieldName, RST, MAPL_RestartOptional
+             endif
+1010         format(a10, '%RST = ', i3, '  RstOpt = ', i3)
+
              skipReading = (RST == MAPL_RestartSkip)
              if (skipReading) cycle
              call ESMF_AttributeGet(field, name='doNotAllocate', isPresent=isPresent, rc=status)
@@ -7647,8 +7663,18 @@ module MAPL_IOMod
              else
                 if (bootStrapable .and. (RST == MAPL_RestartOptional)) then
                     call WRITE_PARALLEL("  Bootstrapping Variable: "//trim(FieldName)//" in "//trim(filename))
+                    if (INDEX(FieldName, 'ADJ') /= 0) THEN
+                     call WRITE_PARALLEL("  Setting restart atr to : MAPL_RestartSkipInitial")
+
+                    ! Set restart attr to indicate bootstrapped
+                    call ESMF_AttributeSet ( field, name='RESTART', &
+                            value=MAPL_RestartSkipInitial, rc=status)
+                    else                       
+
+                       call WRITE_PARALLEL("  Setting restart atr to : MAPL_RestartBootstrap")
                     call ESMF_AttributeSet ( field, name='RESTART', &
                             value=MAPL_RestartBootstrap, rc=status)
+                    endif
                 else
                     _ASSERT(.false., "  Could not find field "//trim(Fieldname)//" in "//trim(filename))
                 end if
@@ -7849,6 +7875,7 @@ module MAPL_IOMod
     type (StringIntegerMap), save      :: RstCollections
     type (StringIntegerMapIterator)    :: iter
     type (StringVariableMap) :: var_map
+    character(len=ESMF_MAXSTR)         :: fname
 
     call ESMF_FieldBundleGet(Bundle,FieldCount=nVars, name=BundleName, rc=STATUS)
     _VERIFY(STATUS)
@@ -8022,6 +8049,14 @@ module MAPL_IOMod
     ndims = ndims + n_unique_ungrid_dims
     ! add 1 for time
     ndims = ndims + 1
+
+    ! get rid of - or + sign at the beginning of filename
+    if (filename(1:1) .eq. '-' .or. filename(1:1) .eq. '+') THEN
+       FNAME = trim(filename(2:))
+    else
+       FNAME = trim(filename)
+    end if
+
 
     !WJ note: if arrdes%write_restart_by_oserver is true, all processors will participate
     if (arrdes%writers_comm/=MPI_COMM_NULL .or. arrdes%write_restart_by_oserver) then
@@ -8384,13 +8419,13 @@ module MAPL_IOMod
        else ! not written by oserver
 
           if (arrdes%num_writers == 1) then
-             call formatter%create(trim(filename), rc=status)
+             call formatter%create(trim(fname), rc=status)
              _VERIFY(status)
              call formatter%write(cf,rc=status)
              _VERIFY(STATUS)
           else
              if (arrdes%write_restart_by_face) then
-                fname_by_face = get_fname_by_face(trim(filename),arrdes%face_index)
+                fname_by_face = get_fname_by_face(trim(fname),arrdes%face_index)
                 call formatter%create_par(trim(fname_by_face),comm=arrdes%face_writers_comm,info=info,rc=status)
                 _VERIFY(status)
              else

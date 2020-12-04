@@ -790,7 +790,6 @@
 
 ! !INTERFACE:
       subroutine ESMF_CFIOFileOpen (cfio, fmode, rc, expid, cyclic)
-
 !
 ! !ARGUMENTS:
 !
@@ -839,7 +838,11 @@
       character(len=16) :: format 
       logical :: ex
       character(len=MLEN) :: fileName
-      logical :: myCyclic 
+      logical :: myCyclic
+      logical :: exists, found, open
+      integer :: LUN, i
+
+      INTEGER, PARAMETER         :: iTop = 199     ! Maximum LUN limit 
 
 
       if (present(expid)) call ESMF_CFIOSet(cfio, expid = expid)
@@ -855,9 +858,24 @@
          print *, trim(fileName), "doesn't exist"
          return
       end if
-      open(11, file=fileName)
-      read(11, '(a)') dset
-      close(11)
+      !======================================================================
+      ! Find an available logical unit 
+      !======================================================================
+      found = .FALSE.
+      i     = 11
+
+      DO WHILE ( .NOT. found .AND. i <= iTop )
+         INQUIRE( UNIT=i, EXIST=exists, OPENED=open )
+         IF ( exists .AND. .NOT. open ) THEN
+            found = .TRUE.
+            lun = i
+         ENDIF
+         i = i + 1
+      ENDDO
+
+      open(LUN, file=fileName)
+      read(LUN, '(a)') dset
+      close(LUN)
       format = 'SDF'
       if (index(dset,'DSET') .ge. 1 .or. index(dset,'dset') .ge. 1  &
           .or. index(dset,'Dset') .ge. 1 ) then
