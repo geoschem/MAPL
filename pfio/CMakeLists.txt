@@ -47,6 +47,8 @@ set (srcs
   CollectiveStageDataMessage.F90
   AddHistCollectionMessage.F90
   ModifyMetadataMessage.F90
+  ForwardDataAndMessage.F90
+  ForwardDataMessage.F90
   ProtocolParser.F90
 
   MpiMutex.F90
@@ -61,11 +63,15 @@ set (srcs
   AbstractServer.F90
   BaseServer.F90
   MpiServer.F90
+  MultiLayerServer.F90
+  MultiCommServer.F90
+  MultiGroupServer.F90
 #  OpenMPServer.F90
   ServerThread.F90
   ServerThreadVector.F90
   BaseThread.F90
   ClientThread.F90
+  FastClientThread.F90
   ClientThreadVector.F90
   ClientManager.F90
   ExtDataCollection.F90
@@ -84,9 +90,22 @@ set (srcs
   StringVectorUtil.F90
   )
 
-esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared )
+#<<<<<<< HEAD # try to keep what we had before
+
+# GCHP: did not work. need to ad MAPL.profiler dependency... try that
+#esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared )
+esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler)
 target_link_libraries (${this} PUBLIC gftl gftl-shared 
                                PRIVATE ${NETCDF_LIBRARIES} $<$<BOOL:${OMP}>:OpenMP::OpenMP_Fortran> MPI::MPI_Fortran)
+#=======
+#esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler NetCDF::NetCDF_Fortran TYPE SHARED)
+#target_link_libraries (${this} PUBLIC gftl-shared
+#                               PRIVATE MPI::MPI_Fortran)
+## CMake has an OpenMP issue with Fortran: https://gitlab.kitware.com/cmake/cmake/-/issues/21280
+#if (NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
+#   target_link_libraries(${this} PRIVATE OpenMP::OpenMP_Fortran)
+#endif ()
+#>>>>>>> gmao/v2.6.4
 target_include_directories (${this} PUBLIC
           $<BUILD_INTERFACE:${MAPL_SOURCE_DIR}/include>)
 
@@ -96,6 +115,7 @@ foreach(dir ${OSX_EXTRA_LIBRARY_PATH})
   target_link_libraries(${this} PRIVATE "-Xlinker -rpath -Xlinker ${dir}")
 endforeach()
 
+#<<<<<<< HEAD # try to keep what we had before
 
 if (NOT CMAKE_Fortran_COMPILER_ID MATCHES GNU)
   # GFortran gives bizarre LD error for the following targets.
@@ -110,8 +130,34 @@ if (NOT CMAKE_Fortran_COMPILER_ID MATCHES GNU)
     SOURCES pfio_collective_demo.F90
     LIBS ${this} ${NETCDF_LIBRARIES} $<$<BOOL:${OMP}>:OpenMP::OpenMP_Fortran> MPI::MPI_Fortran)
   set_target_properties (pfio_collective_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
+#=======
+#ecbuild_add_executable (
+#   TARGET pfio_server_demo.x
+#   SOURCES pfio_server_demo.F90
+#   LIBS ${this} MPI::MPI_Fortran)
+#set_target_properties (pfio_server_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
+## CMake has an OpenMP issue with Fortran: https://gitlab.kitware.com/cmake/cmake/-/issues/21280
+#if (NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
+#   target_link_libraries(pfio_server_demo.x OpenMP::OpenMP_Fortran)
+#endif ()
+#   
+#ecbuild_add_executable (
+#   TARGET pfio_collective_demo.x
+#   SOURCES pfio_collective_demo.F90
+#   LIBS ${this} MPI::MPI_Fortran)
+#set_target_properties (pfio_collective_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
+## CMake has an OpenMP issue with Fortran: https://gitlab.kitware.com/cmake/cmake/-/issues/21280
+#if (NOT CMAKE_Fortran_COMPILER_ID MATCHES "NAG")
+#   target_link_libraries(pfio_collective_demo.x OpenMP::OpenMP_Fortran)
+#>>>>>>> gmao/v2.6.4
 endif ()
 
+# GCHP: the below code is new in v2.6.4. Comment out for now. Replace with what we had.
+#ecbuild_add_executable (
+#  TARGET pfio_writer.x
+#  SOURCES pfio_writer.F90
+#  LIBS ${this} NetCDF::NetCDF_Fortran MPI::MPI_Fortran)
+#set_target_properties (pfio_writer.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
 #--------------------
 include_directories (${INC_NETCDF})
 
@@ -126,6 +172,14 @@ if (LATEX_FOUND)
 #  add_subdirectory (TeX)
 endif ()
 
+#<<<<<<< HEAD # try to keep what we had before
 # GCHP: disable tests
 #add_subdirectory(tests EXCLUDE_FROM_ALL)
 
+#=======
+#
+## Unit testing
+#if (PFUNIT_FOUND)
+#  add_subdirectory(tests EXCLUDE_FROM_ALL)
+#endif ()
+#>>>>>>> gmao/v2.6.4
