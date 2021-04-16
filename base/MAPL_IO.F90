@@ -7631,9 +7631,9 @@ module MAPL_IOMod
                 RST = MAPL_RestartOptional
              end if
    
-             if (MAPL_Am_I_Root()) THEN
-                WRITE(*, 1010) FieldName, RST, MAPL_RestartOptional
-             endif
+             ! if (MAPL_Am_I_Root()) THEN
+             !    WRITE(*, 1010) FieldName, RST, MAPL_RestartOptional
+             ! endif
 1010         format(a10, '%RST = ', i3, '  RstOpt = ', i3)
 
              skipReading = (RST == MAPL_RestartSkip)

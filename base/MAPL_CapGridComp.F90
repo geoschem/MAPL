@@ -1267,13 +1267,10 @@ contains
          n=delt64/real(this%heartbeat_dt,kind=real64)
        ! GridCompRun Timer [Inst]
          RUN_THROUGHPUT = REAL(  this%HEARTBEAT_DT,kind=REAL64)/(END_RUN_TIMER-START_RUN_TIMER)
-         WRITE(*,*) 'RUN_THROUGHPUT = ', RUN_THROUGHPUT
        ! Time loop throughput [Inst]
          INST_THROUGHPUT = REAL(  this%HEARTBEAT_DT,kind=REAL64)/(END_TIMER-START_TIMER)
-         WRITE(*,*) 'INST_THROUGHPUT = ', INST_THROUGHPUT
        ! Time loop throughput [Avg]
          LOOP_THROUGHPUT = REAL(n*this%HEARTBEAT_DT,kind=REAL64)/(END_TIMER- this%loop_start_timer)
-         WRITE(*,*) 'LOOP_THROUGHPUT = ', LOOP_THROUGHPUT
        ! Estimate time remaining (seconds)
          TIME_REMAINING = REAL((this%nsteps-n)*this%HEARTBEAT_DT,kind=REAL64)/LOOP_THROUGHPUT
          HRS_R = FLOOR(TIME_REMAINING/3600.0)
@@ -1413,13 +1410,10 @@ contains
          n=delt64/real(this%heartbeat_dt,kind=real64)
        ! GridCompRun Timer [Inst]
          RUN_THROUGHPUT = REAL(  this%HEARTBEAT_DT,kind=REAL64)/(END_RUN_TIMER-START_RUN_TIMER)
-         WRITE(*,*) 'RUN_THROUGHPUT = ', RUN_THROUGHPUT
        ! Time loop throughput [Inst]
          INST_THROUGHPUT = REAL(  this%HEARTBEAT_DT,kind=REAL64)/(END_TIMER-START_TIMER)
-         WRITE(*,*) 'INST_THROUGHPUT = ', INST_THROUGHPUT
        ! Time loop throughput [Avg]
          LOOP_THROUGHPUT = REAL(n*this%HEARTBEAT_DT,kind=REAL64)/(END_TIMER- this%loop_start_timer)
-         WRITE(*,*) 'LOOP_THROUGHPUT = ', LOOP_THROUGHPUT
        ! Estimate time remaining (seconds)
          TIME_REMAINING = REAL((this%nsteps-n)*this%HEARTBEAT_DT,kind=REAL64)/LOOP_THROUGHPUT
          HRS_R = FLOOR(TIME_REMAINING/3600.0)

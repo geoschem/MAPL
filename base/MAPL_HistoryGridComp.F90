@@ -1302,7 +1302,7 @@ contains
        call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, &
             alarmCount=alarmCount, rc = status )
        _VERIFY(STATUS)
-       WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
+       ! WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
 
        ! I don't understand what's going on here. For some reason when I create the alarm when the clock is running
        ! with a negative timestep, it immediately rings, even though it's an hour in the past...
@@ -1353,7 +1353,7 @@ contains
           call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, &
                alarmCount=alarmCount, rc = status )
           _VERIFY(STATUS)
-          WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
+          ! WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
           if (list(n)%monthly .and. (currTime == RingTime)) then
              call ESMF_AlarmRingerOn( list(n)%his_alarm,rc=status )
              _VERIFY(STATUS)
@@ -1367,7 +1367,7 @@ contains
           call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, &
                alarmCount=alarmCount, rc = status )
           _VERIFY(STATUS)
-          WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
+          ! WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
        endif
 
 ! Mon Alarm based on 1st of Month 00Z
@@ -1404,7 +1404,7 @@ contains
        call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, &
             alarmCount=alarmCount, rc = status )
        _VERIFY(STATUS)
-       WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
+       ! WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
 
 ! End Alarm based on end_date and end_time
 ! ----------------------------------------
@@ -1445,7 +1445,7 @@ contains
            call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, &
                 alarmCount=alarmCount, rc = status )
            _VERIFY(STATUS)
-           WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
+           ! WRITE(6,'("     History Clock now has ", i3, " alarms.")') alarmCount
 
            call  ESMF_AlarmRingerOff(list(n)%end_alarm, rc=status )
            _VERIFY(STATUS)
@@ -3447,7 +3447,7 @@ ENDDO PARSER
    _VERIFY(STATUS)
    Ignore = .false.
    
-   if(.true. .and.  MAPL_AM_I_ROOT() ) then
+   if(.false. .and.  MAPL_AM_I_ROOT() ) then
       write(6,*) "Checking history time"
       call ESMF_ClockGet ( clock,  currTime=CurrTime ,rc=STATUS ) ; _VERIFY(STATUS)
 
