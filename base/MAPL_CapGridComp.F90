@@ -1013,6 +1013,7 @@ contains
       ! name, loop counter, result code
       character (len=ESMF_MAXSTR) :: name
       integer :: i, result
+      integer :: istop
 
     cap => get_CapGridComp_from_gc(gc)
     call MAPL_GetObjectFromGC(gc, maplobj, rc=status)
@@ -1049,7 +1050,6 @@ contains
        ! called properly on reverse time run
        ! Time Loop starts by checking for Segment Ending Time
        !-----------------------------------------------------
-       if (.true.) then
        FAKE_TIME_LOOP: do n = 1, cap%nsteps
 
           if (MAPL_Am_I_Root()) &
@@ -1078,7 +1078,7 @@ contains
        ! Update the cap_restart_time variable to avoid crash on last timestep
        call ESMF_ClockGetNextTime(cap%clock,nextTime=cap%cap_restart_time,rc=status)
        _VERIFY(status)
-       endif
+
        if (MAPL_Am_I_Root()) &
             WRITE(*,*) '  MAPL_CapGC finished time loop, reversing clocks'
        
@@ -1094,9 +1094,15 @@ contains
        call ESMF_ClockSet ( cap%clock_hist, direction=ESMF_DIRECTION_REVERSE, &
                             advancecount=0, rc=status )
        _VERIFY(STATUS)
-    endif
+       endif
 
     if (.not. cap%printspec > 0) then
+       ! Reverse loop needs an extra initialization step
+       if (.not. reverse_time) then
+          istop = cap%nsteps
+       else
+          istop = cap%nsteps + 1
+       endif
 
        ! Time Loop starts by checking for Segment Ending Time
        !-----------------------------------------------------
@@ -1104,7 +1110,7 @@ contains
        _VERIFY(status)
        cap%loop_start_timer = MPI_WTime(status)
        cap%started_loop_timer = .true.
-       TIME_LOOP: do n = 1, cap%nsteps+1
+       TIME_LOOP: do n = 1, istop
 
           call MAPL_MemUtilsWrite(cap%vm, 'MAPL_Cap:TimeLoop', rc = status)
           _VERIFY(status)
@@ -1127,17 +1133,11 @@ contains
              if (done) exit
           endif
 
-#ifdef ADJOINT
-       if (.not. reverse_time) THEN
-#endif
-          call cap%step(status)
-#ifdef ADJOINT
-       ELSE
-          if (MAPL_Am_I_Root()) &
-               print *, 'Calling step_reverse'
-          call cap%step_reverse(n .eq. 1, status)
-       ENDIF
-#endif
+          if (.not. reverse_time) THEN
+             call cap%step(status)
+          ELSE
+             call cap%step_reverse(n .eq. 1, status)
+          ENDIF
           _VERIFY(status)
 
           ! Reset loop average timer to get a better
@@ -1295,7 +1295,6 @@ contains
     _RETURN(ESMF_SUCCESS)
   end subroutine step
 
-#ifdef ADJOINT
   subroutine step_reverse(this, first, rc)
     class(MAPL_CapGridComp), intent(inout) :: this
     logical, intent(in)  :: first
@@ -1437,7 +1436,7 @@ contains
 
     _RETURN(ESMF_SUCCESS)
   end subroutine step_reverse
-#endif
+
   ! !IROUTINE: MAPL_ClockInit -- Sets the clock
 
   ! !INTERFACE: 

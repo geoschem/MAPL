@@ -819,13 +819,10 @@ contains
        call ESMF_ConfigGetAttribute ( cfg, list(n)%ref_date, default=nymdc, &
 	                              label=trim(string) // 'ref_date:',rc=status )
        _VERIFY(STATUS)
-       if (startTime < endTime) THEN
+
        call ESMF_ConfigGetAttribute ( cfg, list(n)%ref_time, default=000000, &
                                       label=trim(string) // 'ref_time:',rc=status )
-       else
-       call ESMF_ConfigGetAttribute ( cfg, list(n)%ref_time, default=240000, &
-                                      label=trim(string) // 'ref_time:',rc=status )
-       endif
+
        _VERIFY(STATUS)
 
        call ESMF_ConfigGetAttribute ( cfg, list(n)%end_date, default=-999, &
@@ -1189,11 +1186,7 @@ contains
           sec = 0
        else
           IntState%average(n) = .true.
-          if (startTime < endTime) then
-             sec = MAPL_nsecf(list(n)%acc_interval) / 2
-          else
-             sec = -MAPL_nsecf(list(n)%acc_interval) / 2
-          endif
+          sec = MAPL_nsecf(list(n)%acc_interval) / 2
        endif
        call ESMF_TimeIntervalSet( INTSTATE%STAMPOFFSET(n), S=sec, rc=status )
        _VERIFY(STATUS)
@@ -1221,44 +1214,23 @@ contains
        ! also in this case sec should be set to non-zero
        sec = MAPL_nsecf( list(n)%frequency )
        call ESMF_TimeIntervalSet( Frequency, S=sec, calendar=cal, rc=status ) ; _VERIFY(STATUS)
-       if (endTime < starttime) Frequency = Frequency * -1
        RingTime = RefTime
 
 ! Added Logic to eliminate BEG_DATE = cap_restart date problem
 ! ------------------------------------------------------------
-       if (endTime > startTime) then
-          if (RefTime == startTime) then
-             if (list(n)%backwards) then
-                RingTime = RefTime
-             else
-                RingTime = RefTime + Frequency
-             endif
-          end if
-       else
-          if (RefTime == endTime) then
-             if (list(n)%backwards) then
-                RingTime = endTime - Frequency
-             else
-                RingTime = startTime
-             endif
-          end if
-       endif
-!
-       if (Frequency == ESMF_TimeIntervalAbsValue(Frequency)) then
-          if (RingTime < currTime .and. sec /= 0 ) then
-             if (list(n)%backwards) then
-                RingTime = RingTime - (INT((currTime - RingTime)/frequency)+1)*frequency
-             else
-                RingTime = RingTime + (INT((currTime - RingTime)/frequency)+1)*frequency
-             endif
+       if (RefTime == startTime) then
+          if (list(n)%backwards) then
+             RingTime = RefTime
+          else
+             RingTime = RefTime + Frequency
           endif
-       else
-          if (RingTime > currTime .and. sec /= 0 ) then
-             if (list(n)%backwards) then
-                RingTime = RingTime - (INT((currTime - RingTime)/frequency)+1)*frequency
-             else
-                RingTime = RingTime + (INT((currTime - RingTime)/frequency)+1)*frequency
-             endif
+       end if
+!
+       if (RingTime < currTime .and. sec /= 0 ) then
+          if (list(n)%backwards) then
+             RingTime = RingTime - (INT((currTime - RingTime)/frequency)+1)*frequency
+          else
+             RingTime = RingTime + (INT((currTime - RingTime)/frequency)+1)*frequency
           endif
        endif
        if(.true. .and.  MAPL_AM_I_ROOT() ) then
@@ -1337,16 +1309,9 @@ contains
              ! and for debugging print
              call WRITE_PARALLEL("DEBUG: monthly averaging is active for collection "//trim(list(n)%collection))
           end if
-          if (startTime < endTime) THEN
-             RingTime = RefTime + IntState%StampOffset(n)
-             if (RingTime < currTime) then
-                RingTime = RingTime + (INT((currTime - RingTime)/frequency)+1)*frequency
-             endif
-          else
-             RingTime = RefTime - IntState%StampOffset(n)
-             if (RingTime > currTime) then
-                RingTime = RingTime + (INT((currTime - RingTime)/frequency)+1)*frequency
-             endif
+          RingTime = RefTime + IntState%StampOffset(n)
+          if (RingTime < currTime) then
+              RingTime = RingTime + (INT((currTime - RingTime)/frequency)+1)*frequency
           endif
           list(n)%seg_alarm = ESMF_AlarmCreate( clock=clock, RingInterval=Frequency, RingTime=RingTime, sticky=.false., rc=status )
           _VERIFY(STATUS)
@@ -2326,7 +2291,7 @@ ENDDO PARSER
                     FIELD_TYPE = FIELD_TYPE,                                 &
                     RC=STATUS  )
                _VERIFY(STATUS)
-               if (startTime < endTime) THEN
+
                call MAPL_VarSpecCreateInList(INTSTATE%DSTS(n)%SPEC,    &
                     SHORT_NAME = list(n)%field_set%fields(3,m),                        &
                     LONG_NAME  = LONG_NAME,                                  &
@@ -2338,19 +2303,6 @@ ENDDO PARSER
                     GRID       = GRID,                                       &
                     FIELD_TYPE = FIELD_TYPE,                                 &
                     RC=STATUS  )
-               else
-               call MAPL_VarSpecCreateInList(INTSTATE%DSTS(n)%SPEC,    &
-                    SHORT_NAME = list(n)%field_set%fields(3,m),                        &
-                    LONG_NAME  = LONG_NAME,                                  &
-                    UNITS      = UNITS,                                      &
-                    DIMS       = DIMS,                                       &
-                    ACCMLT_INTERVAL= -MAPL_nsecf(list(n)%acc_interval),       &
-                    COUPLE_INTERVAL= -MAPL_nsecf(list(n)%frequency   ),       &
-                    VLOCATION  = VLOCATION,                                  &
-                    GRID       = GRID,                                       &
-                    FIELD_TYPE = FIELD_TYPE,                                 &
-                    RC=STATUS  )
-               endif
                _VERIFY(STATUS)
 
             endif ! has_ungrid
@@ -2358,13 +2310,8 @@ ENDDO PARSER
 
          else ! else for if averaged
 
-            if (startTime < endTime) THEN
-               REFRESH = MAPL_nsecf(list(n)%acc_interval)
-               AVGINT  = MAPL_nsecf( list(n)%frequency )
-            else
-               REFRESH = -MAPL_nsecf(list(n)%acc_interval)
-               AVGINT  = -MAPL_nsecf(list(n)%frequency )
-            end if
+            REFRESH = MAPL_nsecf(list(n)%acc_interval)
+            AVGINT  = MAPL_nsecf( list(n)%frequency )
             call ESMF_AttributeSet(F, NAME='REFRESH_INTERVAL', VALUE=REFRESH, RC=STATUS)
             _VERIFY(STATUS)
             call ESMF_AttributeSet(F, NAME='AVERAGING_INTERVAL', VALUE=AVGINT, RC=STATUS)

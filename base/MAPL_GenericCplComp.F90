@@ -426,20 +426,13 @@ contains
                calendar=cal, RC=STATUS)
           _VERIFY(STATUS)
 
-       if (ESMF_TimeIntervalAbsValue(TCLR) < ESMF_TimeIntervalAbsValue(TS)) &
-            TCLR = TS
+          if (TCLR < TS) TCLR = TS
 
           rTime = TM0 + TOFF - TCLR
 
-       if (TS == ESMF_TimeIntervalAbsValue(TS)) THEN
           do while (rTime < currTime) 
              rTime = rTime + TCPL
           end do
-       else
-          do while (rTime > currTime) 
-             rTime = rTime + TCPL
-          end do
-       end if
 
           STATE%TIME_TO_CLEAR(J) = ESMF_AlarmCreate(NAME='TIME2CLEAR_' // trim(COMP_NAME) &
                // '_' // trim(NAME),   &
