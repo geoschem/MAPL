@@ -60,9 +60,7 @@ module MAPL_CapGridCompMod
      procedure :: initialize_history
      procedure :: run
      procedure :: step
-#ifdef ADJOINT
      procedure :: step_reverse
-#endif
      procedure :: finalize
      procedure :: get_model_duration
      procedure :: get_am_i_root

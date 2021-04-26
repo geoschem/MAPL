@@ -425,15 +425,14 @@ contains
     type(ESMF_Field), allocatable :: fldList(:)
     character(len=ESMF_MAXSTR), allocatable :: regexList(:)
     
-! debu nonsense
+! debug variables
     type(ESMF_Time)                :: debugTime
     type(ESMF_TimeInterval)        :: timeStep
     character(len=ESMF_MAXSTR)     :: TimeString
     logical                        :: ringing
     integer                        :: alarmCount
-#ifdef ADJOINT
+! adjoint variable
     integer                        :: reverseTime
-#endif
 ! Begin
 !------
 
@@ -562,13 +561,11 @@ contains
                                          label='VERSION:', default=0, rc=status)
     _VERIFY(STATUS)
 
-#ifdef ADJOINT
     ! Are we running the adjoint?
     call ESMF_ConfigGetAttribute(config, reverseTime,            &
                                  Label="REVERSE_TIME:" ,         &
                                  Default=0,  RC=STATUS)
     _VERIFY(STATUS)
-#endif
 
     if( MAPL_AM_I_ROOT() ) then
        print *
@@ -580,12 +577,9 @@ contains
        print *, 'MarkDone:  '        , INTSTATE%MarkDone
        print *, 'PrePost:   '        , INTSTATE%PrePost
        print *
-#ifdef ADJOINT
-       print *, 'Checking if this is adjoint. REVERSE_TIME = "',  reverseTime, '"'
        if (reverseTime .eq. 1) THEN
-          print *, 'Yes!'
+          print *, 'REVERSE_TIME = "',  reverseTime, '"'
        endif
-#endif
     endif
 
 ! Determine Number of Output Streams
@@ -1391,7 +1385,6 @@ contains
            list(n)%end_alarm = ESMF_AlarmCreate( clock=clock, RingTime=RingTime, sticky=.false., rc=status )
            _VERIFY(STATUS)
         else
-#ifdef ADJOINT
            if (reverseTime .eq. 1) then
               if (MAPL_Am_I_Root()) &
                    WRITE(*,*) ' Setting end_alarm to disabled!'
@@ -1399,13 +1392,11 @@ contains
               ringTime = startTime - oneSecond
               list(n)%end_alarm = ESMF_AlarmCreate( clock=clock, RingTime=ringTime, sticky=.false., enabled=.false., rc=status )
            else
-#endif
               call ESMF_TimeIntervalSet( OneSecond, S = 1, rc=rc )
               ringTime = endTime + oneSecond
               list(n)%end_alarm = ESMF_AlarmCreate( clock=clock, RingTime=ringTime, sticky=.false., rc=status )
-#ifdef ADJOINT
            endif
-#endif
+
            _VERIFY(STATUS)
            call ESMF_ClockGetAlarmList(clock, ESMF_ALARMLIST_ALL, &
                 alarmCount=alarmCount, rc = status )
@@ -3345,7 +3336,7 @@ ENDDO PARSER
 !   ErrLog vars
     integer                        :: status
 
-!   Debug nonsense
+!   Debug variables
     type(ESMF_Time)                :: CurrTime
     character(len=ESMF_MAXSTR)     :: TimeString
     integer                        :: year,month,day,hour,minute

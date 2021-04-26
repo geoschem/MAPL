@@ -282,7 +282,7 @@ contains
     type(ESMF_Field)                      :: field
     integer                               :: cplfunc
     logical                               :: isPresent
-! debug nonsense
+! debug variables
     logical, parameter                    :: clock_debug = .false.
     character(len=ESMF_MAXSTR)            :: tmpstring
     integer                               :: year,month,day,hour,minute,second
