@@ -22,6 +22,12 @@ module MAPL_GriddedIOMod
   use gFTL_StringVector
   use gFTL_StringStringMap
   use MAPL_FileMetadataUtilsMod
+  
+  !==========
+  ! ewl debug
+  use MAPL_CommsMod, only : MAPL_am_I_Root
+  !==========
+
   use, intrinsic :: ISO_C_BINDING
   use, intrinsic :: iso_fortran_env, only: REAL64
   implicit none
@@ -943,35 +949,118 @@ module MAPL_GriddedIOMod
      type(fileMetadataUtils), pointer :: metadata
      real(REAL32) :: missing_value
 
+     ! =========
+     ! ewl debug
+     type(ESMF_VM) :: VM
+     ! =========
+
      collection => Datacollections%at(this%metadata_collection_id)
      metadata => collection%find(filename, __RC__)
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMGetCurrent(VM, RC=STATUS)
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     if ( mapl_am_i_root() ) &
+        print *, "debug: start of request_data_from_file: filename is ", &
+              trim(filename)  
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
 
      filegrid = collection%src_grid
      factory => get_factory(filegrid)
      hasDE=MAPL_GridHasDE(filegrid,rc=status)
      _VERIFY(status)
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     if ( mapl_am_i_root() ) &
+        print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet to get output grid" 
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
      call ESMF_FieldBundleGet(this%output_bundle,grid=output_grid,rc=status)
      _VERIFY(status)
      if (filegrid/=output_grid) then
         this%regrid_handle => new_regridder_manager%make_regridder(filegrid,output_grid,this%regrid_method,rc=status)
         _VERIFY(status)
      end if
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     if ( mapl_am_i_root() ) &
+        print *, "debug: request_data_from_file: calling MAPL_GridGet"
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
      call MAPL_GridGet(filegrid,globalCellCountPerdim=dims,rc=status)
      _VERIFY(status)
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     if ( mapl_am_i_root() ) &
+        print *, "debug: request_data_from_file: calling factory%generate_file_bounds"
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
      call factory%generate_file_bounds(fileGrid,gridLocalStart,gridGlobalStart,gridGlobalCount,metadata=metadata%fileMetadata,rc=status)
      _VERIFY(status)
+
      ! create input bundle
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     if ( mapl_am_i_root() ) &
+        print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet for numVars ", numVars 
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
      call ESMF_FieldBundleGet(this%output_bundle,fieldCount=numVars,rc=status)
      _VERIFY(status)
      allocate(names(numVars),stat=status)
      _VERIFY(status)
      allocate(input_fields(numVars),stat=status)
      _VERIFY(status)
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     if ( mapl_am_i_root() ) &
+        print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet for field name list" 
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
      call ESMF_FieldBundleGet(this%output_bundle,fieldNameList=names,rc=status)
      _VERIFY(status)
      do i=1,numVars
+
+        ! =========
+        ! ewl debug
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        if ( mapl_am_i_root() ) then
+           print *, "debug: request_data_from_file: in loop over fields" 
+           print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet to get varname" 
+        endif
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        ! =========
+
         call ESMF_FieldBundleGet(this%output_bundle,names(i),field=output_field,rc=status)
         _VERIFY(status)
+
+        ! =========
+        ! ewl debug
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        if ( mapl_am_i_root() ) then
+           print *, "debug: request_data_from_file: success, varname is ", trim(names(i)) 
+           print *, "debug: request_data_from_file: calling ESMF_FieldGet to get rank"
+        endif
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        ! =========
+
         call ESMF_FieldGet(output_field,rank=rank,rc=status)
         _VERIFY(status)
         missing_value = MAPL_UNDEF
@@ -979,9 +1068,27 @@ module MAPL_GriddedIOMod
 !ewl           missing_value = metadata%var_get_missing_value(trim(names(i)),_RC)
 !ewl        end if
         if (rank==2) then
+
+           ! =========
+           ! ewl debug
+           call ESMF_VMBarrier(VM, RC=STATUS)
+           if ( mapl_am_i_root() ) &
+              print *, "debug: request_data_from_file: success, rank is 2"
+           call ESMF_VMBarrier(VM, RC=STATUS)
+           ! =========
+
            input_fields(i) = ESMF_FieldCreate(filegrid,typekind=ESMF_TYPEKIND_R4,gridToFieldMap=[1,2],name=trim(names(i)),rc=status)
            _VERIFY(status)
            if (hasDE) then
+
+              ! =========
+              ! ewl debug
+              call ESMF_VMBarrier(VM, RC=STATUS)
+              if ( mapl_am_i_root() ) &
+                 print *, "debug: request_data_from_file: hasDE is true, calling ESMF_FieldGet to get field"
+              call ESMF_VMBarrier(VM, RC=STATUS)
+              ! =========
+
               call ESMF_FieldGet(input_fields(I),0,farrayPtr=ptr2d,rc=status)
               _VERIFY(status)
            else
@@ -993,6 +1100,15 @@ module MAPL_GriddedIOMod
            allocate(globalStart,source=[gridGlobalStart,timeIndex])
            allocate(globalCount,source=[gridGlobalCount,1])
         else if (rank==3) then
+
+           ! =========
+           ! ewl debug
+           call ESMF_VMBarrier(VM, RC=STATUS)
+           if ( mapl_am_i_root() ) &
+              print *, "debug: request_data_from_file: success, rank is 3"
+           call ESMF_VMBarrier(VM, RC=STATUS)
+           ! =========
+
            call ESMF_FieldGet(output_field,ungriddedLBound=lb,ungriddedUBound=ub,rc=status)
            _VERIFY(status)
            lm=ub(1)-lb(1)+1
@@ -1000,6 +1116,15 @@ module MAPL_GriddedIOMod
               ungriddedLBound=lb,ungriddedUBound=ub,name=trim(names(i)),rc=status)
            _VERIFY(status)
            if (hasDE) then
+
+              ! =========
+              ! ewl debug
+              call ESMF_VMBarrier(VM, RC=STATUS)
+              if ( mapl_am_i_root() ) &
+                 print *, "debug: request_data_from_file: hasDE is true, calling ESMF_FieldGet to get field"
+              call ESMF_VMBarrier(VM, RC=STATUS)
+              ! =========
+
               call ESMF_FieldGet(input_fields(I),0,farrayPtr=ptr3d,rc=status)
               _VERIFY(status)
            else
@@ -1011,6 +1136,15 @@ module MAPL_GriddedIOMod
            allocate(globalStart,source=[gridGlobalStart,1,timeIndex])
            allocate(globalCount,source=[gridGlobalCount,lm,1]) 
         end if
+
+        ! =========
+        ! ewl debug
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        if ( mapl_am_i_root() ) &
+           print *, "debug: request_data_from_file: calling i_Clients%collective_prefetch_data" 
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        ! =========
+
         call i_Clients%collective_prefetch_data( &
              this%read_collection_id, fileName, trim(names(i)), &
              & ref, start=localStart, global_start=globalStart, global_count=globalCount)
@@ -1022,6 +1156,15 @@ module MAPL_GriddedIOMod
      deallocate(gridLocalStart,gridGlobalStart,gridGlobalCount)
      this%input_bundle = ESMF_FieldBundleCreate(fieldList=input_fields,rc=status)
      _VERIFY(status)
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     if ( mapl_am_i_root() ) &
+        print *, "debug: request_data_from_file: end of subroutine"
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
      _RETURN(_SUCCESS)
 
   end subroutine request_data_from_file
