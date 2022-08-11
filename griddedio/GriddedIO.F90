@@ -951,6 +951,7 @@ module MAPL_GriddedIOMod
 
      ! =========
      ! ewl debug
+     integer       :: localpet
      type(ESMF_VM) :: VM
      ! =========
 
@@ -960,29 +961,55 @@ module MAPL_GriddedIOMod
      ! =========
      ! ewl debug
      call ESMF_VMGetCurrent(VM, RC=STATUS)
+     call ESMF_VMGet(VM,localpet=localpet,__RC__)
      call ESMF_VMBarrier(VM, RC=STATUS)
-     if ( mapl_am_i_root() ) &
-        print *, "debug: start of request_data_from_file: filename is ", &
-              trim(filename)  
+     print *, localpet, ": debug: request_data_from_file: filename is ", trim(filename)  
      call ESMF_VMBarrier(VM, RC=STATUS)
      ! =========
 
      filegrid = collection%src_grid
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMGetCurrent(VM, RC=STATUS)
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     print *, localpet, ": debug: request_data_from_file: Getting factory..."
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
+
      factory => get_factory(filegrid)
+
+     ! =========
+     ! ewl debug
+     call ESMF_VMGetCurrent(VM, RC=STATUS)
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     print *, localpet, ": debug: request_data_from_file: Setting hasDE..."
+     call ESMF_VMBarrier(VM, RC=STATUS)
+     ! =========
+
      hasDE=MAPL_GridHasDE(filegrid,rc=status)
      _VERIFY(status)
 
      ! =========
      ! ewl debug
      call ESMF_VMBarrier(VM, RC=STATUS)
-     if ( mapl_am_i_root() ) &
-        print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet to get output grid" 
+     print *, localpet, ": debug: request_data_from_file: calling ESMF_FieldBundleGet to get output grid" 
      call ESMF_VMBarrier(VM, RC=STATUS)
      ! =========
 
      call ESMF_FieldBundleGet(this%output_bundle,grid=output_grid,rc=status)
      _VERIFY(status)
+
      if (filegrid/=output_grid) then
+
+        ! =========
+        ! ewl debug
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        print *, localpet, ": debug: request_data_from_file: filegrid is not equal to output_grid. Making regridder."
+        call ESMF_VMBarrier(VM, RC=STATUS)
+        ! =========
+
         this%regrid_handle => new_regridder_manager%make_regridder(filegrid,output_grid,this%regrid_method,rc=status)
         _VERIFY(status)
      end if
@@ -990,8 +1017,7 @@ module MAPL_GriddedIOMod
      ! =========
      ! ewl debug
      call ESMF_VMBarrier(VM, RC=STATUS)
-     if ( mapl_am_i_root() ) &
-        print *, "debug: request_data_from_file: calling MAPL_GridGet"
+     print *, localpet, ": debug: request_data_from_file: calling MAPL_GridGet"
      call ESMF_VMBarrier(VM, RC=STATUS)
      ! =========
 
@@ -1001,8 +1027,7 @@ module MAPL_GriddedIOMod
      ! =========
      ! ewl debug
      call ESMF_VMBarrier(VM, RC=STATUS)
-     if ( mapl_am_i_root() ) &
-        print *, "debug: request_data_from_file: calling factory%generate_file_bounds"
+     print *, localpet, ": bug: request_data_from_file: calling factory%generate_file_bounds"
      call ESMF_VMBarrier(VM, RC=STATUS)
      ! =========
 
@@ -1014,8 +1039,7 @@ module MAPL_GriddedIOMod
      ! =========
      ! ewl debug
      call ESMF_VMBarrier(VM, RC=STATUS)
-     if ( mapl_am_i_root() ) &
-        print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet for numVars ", numVars 
+     print *, localpet, ": debug: request_data_from_file: calling ESMF_FieldBundleGet for numVars ", numVars 
      call ESMF_VMBarrier(VM, RC=STATUS)
      ! =========
 
@@ -1029,8 +1053,7 @@ module MAPL_GriddedIOMod
      ! =========
      ! ewl debug
      call ESMF_VMBarrier(VM, RC=STATUS)
-     if ( mapl_am_i_root() ) &
-        print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet for field name list" 
+     print *, localpet, ": debug: request_data_from_file: calling ESMF_FieldBundleGet for field name list" 
      call ESMF_VMBarrier(VM, RC=STATUS)
      ! =========
 
@@ -1041,10 +1064,7 @@ module MAPL_GriddedIOMod
         ! =========
         ! ewl debug
         call ESMF_VMBarrier(VM, RC=STATUS)
-        if ( mapl_am_i_root() ) then
-           print *, "debug: request_data_from_file: in loop over fields" 
-           print *, "debug: request_data_from_file: calling ESMF_FieldBundleGet to get varname" 
-        endif
+        print *, localpet, ": debug: request_data_from_file: calling ESMF_FieldBundleGet to get varname" 
         call ESMF_VMBarrier(VM, RC=STATUS)
         ! =========
 
@@ -1054,10 +1074,7 @@ module MAPL_GriddedIOMod
         ! =========
         ! ewl debug
         call ESMF_VMBarrier(VM, RC=STATUS)
-        if ( mapl_am_i_root() ) then
-           print *, "debug: request_data_from_file: success, varname is ", trim(names(i)) 
-           print *, "debug: request_data_from_file: calling ESMF_FieldGet to get rank"
-        endif
+        print *, localpet, ": debug: request_data_from_file: success, varname is ", trim(names(i)) ,'. Calling ESMF_FieldGet to get rank'
         call ESMF_VMBarrier(VM, RC=STATUS)
         ! =========
 
@@ -1072,8 +1089,7 @@ module MAPL_GriddedIOMod
            ! =========
            ! ewl debug
            call ESMF_VMBarrier(VM, RC=STATUS)
-           if ( mapl_am_i_root() ) &
-              print *, "debug: request_data_from_file: success, rank is 2"
+           print *, localpet, ": debug: request_data_from_file: success, rank is 2"
            call ESMF_VMBarrier(VM, RC=STATUS)
            ! =========
 
@@ -1084,8 +1100,7 @@ module MAPL_GriddedIOMod
               ! =========
               ! ewl debug
               call ESMF_VMBarrier(VM, RC=STATUS)
-              if ( mapl_am_i_root() ) &
-                 print *, "debug: request_data_from_file: hasDE is true, calling ESMF_FieldGet to get field"
+              print *, localpet, ": debug: request_data_from_file: hasDE is true, calling ESMF_FieldGet to get field"
               call ESMF_VMBarrier(VM, RC=STATUS)
               ! =========
 
@@ -1104,8 +1119,7 @@ module MAPL_GriddedIOMod
            ! =========
            ! ewl debug
            call ESMF_VMBarrier(VM, RC=STATUS)
-           if ( mapl_am_i_root() ) &
-              print *, "debug: request_data_from_file: success, rank is 3"
+           print *, localpet, ": debug: request_data_from_file: success, rank is 3"
            call ESMF_VMBarrier(VM, RC=STATUS)
            ! =========
 
@@ -1120,8 +1134,7 @@ module MAPL_GriddedIOMod
               ! =========
               ! ewl debug
               call ESMF_VMBarrier(VM, RC=STATUS)
-              if ( mapl_am_i_root() ) &
-                 print *, "debug: request_data_from_file: hasDE is true, calling ESMF_FieldGet to get field"
+              print *, localpet, ": debug: request_data_from_file: hasDE is true, calling ESMF_FieldGet to get field"
               call ESMF_VMBarrier(VM, RC=STATUS)
               ! =========
 
@@ -1140,8 +1153,7 @@ module MAPL_GriddedIOMod
         ! =========
         ! ewl debug
         call ESMF_VMBarrier(VM, RC=STATUS)
-        if ( mapl_am_i_root() ) &
-           print *, "debug: request_data_from_file: calling i_Clients%collective_prefetch_data" 
+        print *, localpet, ": debug: request_data_from_file: calling i_Clients%collective_prefetch_data" 
         call ESMF_VMBarrier(VM, RC=STATUS)
         ! =========
 
@@ -1160,8 +1172,7 @@ module MAPL_GriddedIOMod
      ! =========
      ! ewl debug
      call ESMF_VMBarrier(VM, RC=STATUS)
-     if ( mapl_am_i_root() ) &
-        print *, "debug: request_data_from_file: end of subroutine"
+     print *, localpet, ": debug: request_data_from_file: end of subroutine"
      call ESMF_VMBarrier(VM, RC=STATUS)
      ! =========
 
