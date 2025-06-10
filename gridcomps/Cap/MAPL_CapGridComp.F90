@@ -1224,6 +1224,10 @@ contains
 
           call cap%increment_step_counter()
 
+          ! ewl mem debug
+          call ESMF_VMBarrier(cap%vm,rc=status)
+          _VERIFY(status)
+
           call MAPL_MemUtilsWrite(cap%vm, 'MAPL_Cap:TimeLoop', rc = status)
           _VERIFY(status)
 
@@ -1290,30 +1294,80 @@ contains
     phase_ = 1
     if (present(phase)) phase_ = phase
 
+    ! ewl mem debug
+    call ESMF_VMBarrier(this%vm,rc=status)
+    _VERIFY(status)
+    call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: Start of cap%step', rc = status)
+    _VERIFY(status)
+
     call ESMF_GridCompGet(this%gc, vm = this%vm)
 
     ! Run the ExtData Component
     ! --------------------------
     if (phase_ == 1) then
 
+       ! ewl mem debug
+       call ESMF_VMBarrier(this%vm,rc=status)
+       _VERIFY(status)
+       call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: Before ExtData Run', rc = status)
+       _VERIFY(status)
+
       call first_phase(rc=status)
       _VERIFY(status)
 
+       ! ewl mem debug
+       call ESMF_VMBarrier(this%vm,rc=status)
+       _VERIFY(status)
+       call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: After ExtData Run', rc = status)
+       _VERIFY(status)
+
     endif ! phase_ == 1
     ! Run the Gridded Component
-    ! --------------------------
+    ! --------------------------'
+
+    ! ewl mem debug
+    call ESMF_VMBarrier(this%vm,rc=status)
+    _VERIFY(status)
+    call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: Before GCHP run', rc = status)
+    _VERIFY(status)
+
     call ESMF_GridCompRun(this%gcs(this%root_id), importstate = this%child_imports(this%root_id), &
          exportstate = this%child_exports(this%root_id), &
          clock = this%clock, phase=phase_, userrc = status)
     _VERIFY(status)
+
+    ! ewl mem debug
+    call ESMF_VMBarrier(this%vm,rc=status)
+    _VERIFY(status)
+    call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: After GCHP run', rc = status)
+    _VERIFY(status)
+
     ! Advance the Clock and run History and Record
     ! ---------------------------------------------------
     if (phase_ == this%n_run_phases) then
 
+       ! ewl mem debug
+       call ESMF_VMBarrier(this%vm,rc=status)
+       _VERIFY(status)
+       call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: Before History run', rc = status)
+       _VERIFY(status)
+
        call last_phase(rc=status)
        _VERIFY(STATUS)
 
+       ! ewl mem debug
+       call ESMF_VMBarrier(this%vm,rc=status)
+       _VERIFY(status)
+       call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: After History run', rc = status)
+       _VERIFY(status)
+
     endif !phase_ == last
+
+    ! ewl mem debug
+    call ESMF_VMBarrier(this%vm,rc=status)
+    _VERIFY(status)
+    call MAPL_MemUtilsWrite(this%vm, 'MAPL_Cap: End of cap%step', rc = status)
+    _VERIFY(status)
 
     _RETURN(ESMF_SUCCESS)
 
