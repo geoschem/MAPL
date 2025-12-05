@@ -89,6 +89,8 @@ contains
       end if
 
       call MAPL_GridCompGet(gridcomp, logger=lgr, _RC)
+      call lgr%debug('modify_advertise::ExtDataGridComp.F90: starting...')
+
       call ESMF_ClockGet(clock, currTime=current_time, timeStep=time_step, _RC)
       call MAPL_GridCompGet(gridcomp, hconfig=hconfig, _RC)
       extdata_gridcomp%active_items = get_active_items(exportState, _RC)
@@ -96,6 +98,7 @@ contains
       rule_counter = 0
       iter = extdata_gridcomp%active_items%ftn_begin()
       do while (iter /= extdata_gridcomp%active_items%ftn_end())
+         call lgr%debug('modify_advertise::ExtDataGridComp.F90: Loop over active items in extdata_gridcomp')
          call iter%next()
          item_name => iter%of()
          has_rule = config%has_rule_for(item_name, _RC)
