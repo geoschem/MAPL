@@ -14,9 +14,10 @@ set(srcs
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
 
-if (BUILD_WITH_PFLOGGER)
-  find_package (PFLOGGER REQUIRED)
-endif ()
+# Comment out for GCHP since built as part of project
+#if (BUILD_WITH_PFLOGGER)
+#  find_package (PFLOGGER REQUIRED)
+#endif ()
 
 esma_add_library(${this}
   SRCS ${srcs}

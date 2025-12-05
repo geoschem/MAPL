@@ -10,9 +10,10 @@ set(srcs
   HConfigUtilities.F90
   )
 
-if (BUILD_WITH_PFLOGGER)
-  find_package (PFLOGGER REQUIRED)
-endif ()
+# Comment out for GCHP since built within project
+#if (BUILD_WITH_PFLOGGER)
+#  find_package (PFLOGGER REQUIRED)
+#endif ()
 
 esma_add_library(${this}
   SRCS ${srcs}

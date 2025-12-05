@@ -91,9 +91,10 @@ set (srcs
   StringVectorUtil.F90
   )
 
-if (BUILD_WITH_PFLOGGER)
-  find_package (PFLOGGER REQUIRED)
-endif ()
+# Skip this for GCHP since built within project
+#if (BUILD_WITH_PFLOGGER)
+#  find_package (PFLOGGER REQUIRED)
+#endif ()
 
 esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler NetCDF::NetCDF_Fortran NetCDF::NetCDF_C TYPE SHARED)
 

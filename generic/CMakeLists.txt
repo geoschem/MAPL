@@ -54,11 +54,12 @@ set (srcs
   CallbackMap.F90
   )
 
-if (BUILD_WITH_PFLOGGER)
-  find_package(PFLOGGER REQUIRED)
-endif ()
-find_package(GFTL REQUIRED)
-find_package(GFTL_SHARED REQUIRED)
+# Comment for GCHP since built as part of project rather than externally
+#if (BUILD_WITH_PFLOGGER)
+#  find_package(PFLOGGER REQUIRED)
+#endif ()
+#find_package(GFTL REQUIRED)
+#find_package(GFTL_SHARED REQUIRED)
 
 esma_add_library(${this}
   SRCS ${srcs}

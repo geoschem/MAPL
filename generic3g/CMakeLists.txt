@@ -38,12 +38,14 @@ set(srcs
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
 
 find_package (MPI REQUIRED)
-find_package (GFTL REQUIRED)
-find_package (GFTL_SHARED REQUIRED)
-find_package (YAFYAML REQUIRED)
-if (BUILD_WITH_PFLOGGER)
-  find_package (PFLOGGER REQUIRED)
-endif ()
+
+# Comment out for GCHP since built as part of project
+#find_package (GFTL REQUIRED)
+#find_package (GFTL_SHARED REQUIRED)
+#find_package (YAFYAML REQUIRED)
+#if (BUILD_WITH_PFLOGGER)
+#  find_package (PFLOGGER REQUIRED)
+#endif ()
 
 esma_add_library(${this}
   SRCS ${srcs}
