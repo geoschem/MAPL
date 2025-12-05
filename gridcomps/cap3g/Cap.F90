@@ -78,12 +78,23 @@ contains
       time: do while (currTime < stopTime)
          ! TODO:  include Bill's monitoring log messages here
          call ESMF_TimeGet(currTime, timeString=iso_time, _RC)
-         call lgr%info('cap time: %a', trim(iso_time)) 
+         call lgr%info('cap time: %a', trim(iso_time))
+
+         call ESMF_TimeGet(stopTime, timeString=iso_time, _RC)
+         call lgr%debug('cap stop time: %a', trim(iso_time))
+
+         call lgr%debug('Cap.F90:integrate: calling driver%run')
          call driver%run(phase_idx=GENERIC_RUN_USER, _RC)
+         call lgr%debug('Cap.F90:integrate: finished driver%run')
+
          currTime = advance_clock(driver, _RC)
+         call lgr%debug('Cap.F90:integrate: advanced clock to new time: %a', trim(iso_time))
+
          call checkpoint(driver, checkpointing, final=.false., _RC)
+         call lgr%debug('Cap.F90:integrate: called checkpointing within time loop')
       end do time
       call checkpoint(driver, checkpointing, final=.true., _RC)
+      call lgr%debug('Cap.F90:integrate: final checkpointing done')
 
       _RETURN(_SUCCESS)
    end subroutine integrate
