@@ -797,7 +797,7 @@ CONTAINS
     end do
 
     call lgr%info('*******************************************************')
-    call lgr%info('** Variables to be provided by the ExtData Component **')
+    call lgr%info('** Variables to be provided by the ExtData Component (1G) **')
     call lgr%info('*******************************************************')
     do i = 1, ItemCount
        call lgr%info('---- %i0.5~: %a', i, trim(ItemNames(i)))

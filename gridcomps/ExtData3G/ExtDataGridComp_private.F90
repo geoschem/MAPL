@@ -136,7 +136,7 @@ contains
       integer :: i
 
       call lgr%info('*******************************************************')
-      call lgr%info('** Variables to be provided by the ExtData Component **')
+      call lgr%info('** Variables to be provided by the ExtData Component (3G) **')
       call lgr%info('*******************************************************')
       iter = exports%ftn_begin()
       i=0

@@ -498,7 +498,7 @@ CONTAINS
    call confirm_imports_for_vregrid(self%primary, import, _RC)
 
    call extdata_lgr%info('*******************************************************')
-   call extdata_lgr%info('** Variables to be provided by the ExtData Component **')
+   call extdata_lgr%info('** Variables to be provided by the ExtData Component (2G) **')
    call extdata_lgr%info('*******************************************************')
    do i = 1, ItemCount
       call extdata_lgr%info('---- %i0.5~: %a', i, trim(ItemNames(i)))
