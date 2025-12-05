@@ -96,7 +96,9 @@ set (srcs
 #  find_package (PFLOGGER REQUIRED)
 #endif ()
 
-esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler NetCDF::NetCDF_Fortran NetCDF::NetCDF_C TYPE SHARED)
+# Exclude NetCDF_C dependency in GCHP since only needed for executables not added
+#esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler NetCDF::NetCDF_Fortran NetCDF::NetCDF_C TYPE SHARED)
+esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler NetCDF::NetCDF_Fortran TYPE SHARED)
 
 target_link_libraries (${this} PUBLIC GFTL::gftl-v2 GFTL_SHARED::gftl-shared-v2 GFTL_SHARED::gftl-shared PFLOGGER::pflogger PRIVATE MPI::MPI_Fortran OpenMP::OpenMP_Fortran)
 target_include_directories (${this} PUBLIC
@@ -188,11 +190,21 @@ set_target_properties (pfio_open_close.x PROPERTIES Fortran_MODULE_DIRECTORY ${i
 #   LIBS ${this} MPI::MPI_Fortran)
 #set_target_properties (pfio_collective_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
 #target_link_libraries(pfio_collective_demo.x OpenMP::OpenMP_Fortran)
+
+# Customize this for GCHP
+#ecbuild_add_executable (
+#  TARGET pfio_writer.x
+#  SOURCES pfio_writer.F90
+#  LIBS ${this} NetCDF::NetCDF_Fortran NetCDF::NetCDF_C MPI::MPI_Fortran)
+#set_target_properties (pfio_writer.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
 ecbuild_add_executable (
   TARGET pfio_writer.x
   SOURCES pfio_writer.F90
-  LIBS ${this} NetCDF::NetCDF_Fortran NetCDF::NetCDF_C MPI::MPI_Fortran)
+  LIBS ${this} ${NETCDF_LIBRARIES} $<$<BOOL:${OMP}>:OpenMP::OpenMP_Fortran> MPI::MPI_Fortran)
 set_target_properties (pfio_writer.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
+
+# Add next line for GCHP
+include_directories (${INC_NETCDF})
 
 #--------------------
 # Copy include files that are used by other libraries.
