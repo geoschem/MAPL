@@ -173,20 +173,21 @@ ecbuild_add_executable (
 
 set_target_properties (pfio_open_close.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
 
-ecbuild_add_executable (
-   TARGET pfio_server_demo.x
-   SOURCES pfio_server_demo.F90
-   LIBS ${this} MPI::MPI_Fortran)
-set_target_properties (pfio_server_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
-target_link_libraries(pfio_server_demo.x OpenMP::OpenMP_Fortran)
+# Do not add executable for pfio_server_demo if using GCHP
+#ecbuild_add_executable (
+#   TARGET pfio_server_demo.x
+#   SOURCES pfio_server_demo.F90
+#   LIBS ${this} MPI::MPI_Fortran)
+#set_target_properties (pfio_server_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
+#target_link_libraries(pfio_server_demo.x OpenMP::OpenMP_Fortran)
 
-ecbuild_add_executable (
-   TARGET pfio_collective_demo.x
-   SOURCES pfio_collective_demo.F90
-   LIBS ${this} MPI::MPI_Fortran)
-set_target_properties (pfio_collective_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
-target_link_libraries(pfio_collective_demo.x OpenMP::OpenMP_Fortran)
-
+# Do not add executable for pfio_collective_demo if using GCHP
+#ecbuild_add_executable (
+#   TARGET pfio_collective_demo.x
+#   SOURCES pfio_collective_demo.F90
+#   LIBS ${this} MPI::MPI_Fortran)
+#set_target_properties (pfio_collective_demo.x PROPERTIES Fortran_MODULE_DIRECTORY ${include_${this}})
+#target_link_libraries(pfio_collective_demo.x OpenMP::OpenMP_Fortran)
 ecbuild_add_executable (
   TARGET pfio_writer.x
   SOURCES pfio_writer.F90
