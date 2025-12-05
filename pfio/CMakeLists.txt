@@ -218,7 +218,8 @@ if (LATEX_FOUND)
 endif ()
 
 
-# Unit testing
-if (PFUNIT_FOUND)
-  add_subdirectory(tests EXCLUDE_FROM_ALL)
-endif ()
+# Comment out for GCHP since not using
+## Unit testing
+#if (PFUNIT_FOUND)
+#  add_subdirectory(tests EXCLUDE_FROM_ALL)
+#endif ()
