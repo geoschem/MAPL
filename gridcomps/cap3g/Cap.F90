@@ -82,10 +82,10 @@ contains
 
          call ESMF_TimeGet(stopTime, timeString=iso_time, _RC)
          call lgr%debug('cap stop time: %a', trim(iso_time))
-
-         call lgr%debug('Cap.F90:integrate: calling driver%run')
+         
+         call lgr%debug('Cap.F90:integrate: calling driver run')
          call driver%run(phase_idx=GENERIC_RUN_USER, _RC)
-         call lgr%debug('Cap.F90:integrate: finished driver%run')
+         call lgr%debug('Cap.F90:integrate: finished driver run')
 
          currTime = advance_clock(driver, _RC)
          call lgr%debug('Cap.F90:integrate: advanced clock to new time: %a', trim(iso_time))

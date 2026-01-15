@@ -15,17 +15,26 @@ contains
       integer :: status, user_status
 
       _ASSERT(present(phase_idx), 'until made not optional')
+
+      ! ewl debug
+      print *, "ewl debug: in run.F90:run. starting..."
       
       associate ( &
            importState => this%states%importState, &
            exportState => this%states%exportState)
 
+      ! ewl debug
+      print *, "ewl debug: in run.F90:run. import and export states associated"
+      print *, "ewl debug: in run.F90:run. calling ESMF_GridCompRun"
+        
         call ESMF_GridCompRun(this%gridcomp, &
              importState=importState, &
              exportState=exportState, &
              clock=this%clock, &
              phase=phase_idx, _USERRC)
       end associate
+
+      print *, "ewl debug: in run.F90:run. done"
 
       _RETURN(_SUCCESS)
       _UNUSED_DUMMY(unusable)

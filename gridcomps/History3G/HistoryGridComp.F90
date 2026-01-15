@@ -26,10 +26,14 @@ contains
       integer :: num_collections, status
       type(ESMF_TimeInterval), allocatable :: timeStep
 
+      _HERE, 'ewl debug: SetServices::History:: starting...'
+      
       ! Set entry points
       call MAPL_GridCompSetEntryPoint(gridcomp, ESMF_METHOD_INITIALIZE, init, phase_name="GENERIC::INIT_USER", _RC)
       call MAPL_GridCompSetEntryPoint(gridcomp, ESMF_METHOD_RUN, run, phase_name='run', _RC)
 
+      _HERE, 'ewl debug: SetServices::History:: 1'
+      
       ! Determine collections
       call MAPL_GridCompGet(gridcomp, hconfig=hconfig, _RC)
 
@@ -40,6 +44,9 @@ contains
          _RETURN(_SUCCESS)
       end if
 
+      
+      _HERE, 'ewl debug: SetServices::History:: 2'
+
       collections_config = ESMF_HConfigCreateAt(hconfig, keystring='active_collections', _RC)
       num_collections = ESMF_HConfigGetSize(collections_config, _RC)
       _RETURN_UNLESS(num_collections > 0)
@@ -48,6 +55,8 @@ contains
       iter_end = ESMF_HConfigIterEnd(collections_config, _RC)
       iter = iter_begin
 
+      _HERE, 'ewl debug: SetServices::History:: 3'
+      
       do while (ESMF_HConfigIterLoop(iter, iter_begin, iter_end, rc=status))
          _VERIFY(status)
          collection_name = ESMF_HConfigAsString(iter, _RC)
@@ -60,7 +69,11 @@ contains
 
          child_spec = ChildSpec(user_setservices(collection_setServices), hconfig=child_hconfig, timeStep=timeStep)
          call MAPL_GridCompAddChild(gridcomp, child_name, child_spec,_RC)
+
+         _HERE, 'ewl debug: SetServices::History:: 4 (in while loop)'
       end do
+
+      _HERE, 'ewl debug: SetServices::History:: complete'
       
       _RETURN(_SUCCESS)
    end subroutine setServices
@@ -76,6 +89,10 @@ contains
 
       time_hconfig = ESMF_HConfigCreateAt(hconfig, keyString='time_spec', _RC)
 
+      ! ewl note: there is a problem with time_hconfig returned above.
+      ! ESMF says: ESMCI::HConfig::createAtKey() Invalid argument -
+      ! HConfig object MUST be map when key specific.
+      ! So - is time_hconfig not a map? Is there incorrect syntax in history.yaml?
       has_frequency = ESMF_HConfigIsDefined(time_hconfig, keyString='frequency', _RC)
       if (has_frequency) then
          timeStep = mapl_HConfigAsTimeInterval(time_hconfig, keystring='frequency', _RC)

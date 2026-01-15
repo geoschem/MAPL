@@ -46,6 +46,8 @@ contains
       type(ESMF_HConfig) :: hconfig
       integer :: status
 
+      _HERE, 'ewl debug: SetServices::ExtData:: starting...'
+      
       call MAPL_GridCompSetEntryPoint(gridcomp, ESMF_METHOD_INITIALIZE, modify_advertise, phase_name="GENERIC::INIT_MODIFY_ADVERTISED", _RC)
       call MAPL_GridCompSetEntryPoint(gridcomp, ESMF_METHOD_RUN, run, phase_name='run', _RC)
 
@@ -55,6 +57,8 @@ contains
 
       _SET_NAMED_PRIVATE_STATE(gridcomp, ExtDataGridComp, PRIVATE_STATE)
 
+      _HERE, 'ewl debug: SetServices::ExtData:: complete'
+      
       _RETURN(_SUCCESS)
    end subroutine setServices
 
