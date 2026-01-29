@@ -538,7 +538,7 @@ NAMED_MAPPINGS = {
         STRING: lambda value: add_quotes(value),
         STRINGVECTOR: lambda value: construct_string_vector(value),
         ARRAY: lambda value: mk_array(value),
-        MANGLED: lambda name: f"'{rm_quotes(name).replace("*","'//trim(comp_name)//'")}'" if name else None,
+        MANGLED: lambda name: f"{rm_quotes(name).replace('*','//trim(comp_name)//')}" if name else None,
         STANDARD_NAME: mangle_standard_name,
         RANK: compute_rank, 
         MAKE_BLOCK: lambda value: partial(make_block, value),
