@@ -200,6 +200,7 @@ contains
      enddo
 
      if (fail_on_missing) then
+        print *, "ewl: ", trim(trial_file)
         _ASSERT(file_found,"Could not find any file to open to determine metadata after multiple trials")
         filename = trial_file
      else
