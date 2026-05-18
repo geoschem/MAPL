@@ -45,7 +45,12 @@ add_pfunit_ctest(MAPL.pfio.tests
                 MAX_PES 8
                 )
 set_target_properties(MAPL.pfio.tests PROPERTIES Fortran_MODULE_DIRECTORY ${MODULE_DIRECTORY})
+target_include_directories(MAPL.pfio.tests PRIVATE
+  ${esma_include}/MAPL.pfunit
+  ${esma_include}/MAPL.pfio
+  ${esma_include}/MAPL.shared)
 set_tests_properties(MAPL.pfio.tests PROPERTIES LABELS "ESSENTIAL")
+set_tests_properties(MAPL.pfio.tests PROPERTIES PROCESSORS 8)
 
 include_directories(
    ${CMAKE_CURRENT_SOURCE_DIR}
@@ -65,6 +70,7 @@ ecbuild_add_executable (
   LIBS MAPL.shared MAPL.pfio NetCDF::NetCDF_Fortran MPI::MPI_Fortran
   DEFINITIONS USE_MPI)
 target_link_libraries(${TESTO} OpenMP::OpenMP_Fortran)
+target_include_directories(${TESTO} PRIVATE ${esma_include}/MAPL.shared ${esma_include}/MAPL.pfio)
 set_target_properties(${TESTO} PROPERTIES Fortran_MODULE_DIRECTORY ${MODULE_DIRECTORY})
 
 # Detect if we are using Open MPI and add oversubscribe
@@ -111,28 +117,17 @@ foreach (test ${pfio_tests})
   set_tests_properties (${test} PROPERTIES LABELS "PERFORMANCE")
 endforeach ()
 
+set_tests_properties(pFIO_tests_mpi PROPERTIES PROCESSORS 18 RESOURCE_LOCK pfio_ctest_io)
+set_tests_properties(pFIO_tests_simple PROPERTIES PROCESSORS 24 RESOURCE_LOCK pfio_ctest_io)
+set_tests_properties(pFIO_tests_hybrid PROPERTIES PROCESSORS 12 RESOURCE_LOCK pfio_ctest_io)
+set_tests_properties(pFIO_tests_mpi_2comm PROPERTIES PROCESSORS 18 RESOURCE_LOCK pfio_ctest_io)
+set_tests_properties(pFIO_tests_mpi_2group PROPERTIES PROCESSORS 18 RESOURCE_LOCK pfio_ctest_io)
+
 #if (APPLE)
 #  set_tests_properties (pFIO_tests_mpi_2layer PROPERTIES DISABLED True)
 #endif ()
 
-set(TESTPERF pfio_performance.x)
-
-ecbuild_add_executable (
-  TARGET ${TESTPERF}
-  NOINSTALL
-  SOURCES pfio_performance.F90
-  DEFINITIONS USE_MPI
-  LIBS MAPL.pfio NetCDF::NetCDF_Fortran MPI::MPI_Fortran)
-target_link_libraries(${TESTPERF} MAPL.pfio NetCDF::NetCDF_Fortran OpenMP::OpenMP_Fortran)
-set_target_properties(${TESTPERF} PROPERTIES Fortran_MODULE_DIRECTORY ${MODULE_DIRECTORY})
-
-add_test(NAME pFIO_performance
-  COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 12 ${MPIEXEC_PREFLAGS} ${CMAKE_CURRENT_BINARY_DIR}/${TESTO} ${TESTO_FLAGS} -s hybrid
-  )
-set_tests_properties (pFIO_performance PROPERTIES LABELS "PERFORMANCE")
-
 add_dependencies(build-tests MAPL.pfio.tests)
 add_dependencies(build-tests ${TESTO})
 add_dependencies(build-tests pfio_writer.x)
-add_dependencies(build-tests ${TESTPERF})
 

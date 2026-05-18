@@ -1,8 +1,4 @@
 # Comment out for GCHP
-
-#name: "Deploy Documentation"
-#description: "Deploy documentation to GitHub Pages"
-#
 ## Define the inputs for this action
 #inputs:
 #  ford-input:
@@ -27,7 +23,7 @@
 #      shell: bash
 #
 #    - name: Setup Python
-#      uses: actions/setup-python@v5
+#      uses: actions/setup-python@v6
 #      with:
 #        python-version: '3.x'
 #
@@ -46,12 +42,12 @@
 #    # If you change the ref below make sure to change
 #    # the gFTL version in the Ford control files as well!
 #    - name: Checkout gFTL
-#      uses: actions/checkout@v4
+#      uses: actions/checkout@v6
 #      with:
 #        repository: Goddard-Fortran-Ecosystem/gFTL
 #        path: gFTL
 #        fetch-depth: 1
-#        ref: v1.15.2
+#        ref: v1.17.0
 #
 #    - name: Build gFTL
 #      run: |
@@ -70,7 +66,7 @@
 #
 #    - name: Deploy Pages
 #      uses: JamesIves/github-pages-deploy-action@v4
-#      if: github.event_name == 'push' && github.repository == 'GEOS-ESM/MAPL' && ( startsWith( github.ref, 'refs/tags/v' ) || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/MAPL-v3' )
+#      if: github.event_name == 'push' && github.repository == 'GEOS-ESM/MAPL' && ( startsWith( github.ref, 'refs/tags/v' ) || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' )
 #      with:
 #        folder: ${{ inputs.doc-folder }}
 #        target-folder: ${{ inputs.target-folder }}

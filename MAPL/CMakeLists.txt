@@ -1,11 +1,40 @@
-esma_set_this()
+esma_set_this ()
 
+# Common dependencies always required
+set (mapl_dependencies
+  MAPL.base
+  MAPL.pfio
+  MAPL_cfio_r4
+  MAPL.griddedio
+  MAPL.field_utils
+  MAPL.state_utils
+  MAPL.vertical
+  MAPL.oomph
+  ESMF::ESMF
+  NetCDF::NetCDF_Fortran
+  MPI::MPI_Fortran
+  $<$<BOOL:${BUILD_WITH_FLAP}>:FLAP::FLAP>
+  )
+
+# Full-MAPL mode adds the generic layer, gridcomps, and Python bridge
+# GCHP: exclude python_bridge
+#list (APPEND mapl_dependencies
+#  MAPL.generic
+#  MAPL.gridcomps
+#  MAPL.orbit
+#  MAPL.python_bridge
+#  ${EXTDATA_TARGET}
+#  )
+list (APPEND mapl_dependencies
+  MAPL.generic
+  MAPL.gridcomps
+  MAPL.orbit
+  ${EXTDATA_TARGET}
+  )
 
 esma_add_library (${this}
   SRCS MAPL.F90
-  DEPENDENCIES MAPL.base MAPL.generic MAPL.pfio MAPL_cfio_r4 MAPL.gridcomps MAPL.orbit MAPL.griddedio MAPL.field_utils ${EXTDATA_TARGET}
-               ESMF::ESMF NetCDF::NetCDF_Fortran MPI::MPI_Fortran
-               $<$<BOOL:${BUILD_WITH_FLAP}>:FLAP::FLAP>
+  DEPENDENCIES ${mapl_dependencies}
   TYPE ${MAPL_LIBRARY_TYPE}
   )
 

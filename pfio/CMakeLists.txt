@@ -96,7 +96,7 @@ set (srcs
 #  find_package (PFLOGGER REQUIRED)
 #endif ()
 
-# Exclude NetCDF_C dependency since only needed for demos which are not used in GCHP
+# For GCHP: exclude NetCDF_C dependency since only needed for demos which are not used in GCHP
 #esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler NetCDF::NetCDF_Fortran NetCDF::NetCDF_C TYPE ${MAPL_LIBRARY_TYPE})
 esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.profiler NetCDF::NetCDF_Fortran TYPE ${MAPL_LIBRARY_TYPE})
 
