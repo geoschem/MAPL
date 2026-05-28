@@ -130,8 +130,11 @@ contains
             vertical_coord%vertical_type = fixed_height
             _RETURN(_SUCCESS)
          end if
+
          ! now test if this is a model pressure, the positive says is vertical and formula_terms says, this is a parametric quantity
-         if (coord_var%is_attribute_present("positive") .and. coord_var%is_attribute_present("formula_terms")) then
+         ! Exclude if vertical coord unit is 1 or level, for backwards compliance with non-CF files
+         if (coord_var%is_attribute_present("positive") .and. coord_var%is_attribute_present("formula_terms") &
+              .and. .not. any(temp_units == ["1    ", "level"]) ) then
             standard_name = coord_var%get_attribute_string("standard_name") 
             formula_terms = coord_var%get_attribute_string("formula_terms")
             if (standard_name == "atmosphere_hybrid_sigma_pressure_coordinate") then
