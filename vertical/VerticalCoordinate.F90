@@ -137,13 +137,23 @@ contains
             _RETURN(_SUCCESS)
          end if
 
-         ! now test if this is a model pressure, the positive says is vertical and formula_terms says, this is a parametric quantity
-         ! Exclude if vertical coord unit is 1 or level, for backwards compliance with non-CF files
+         ! now test if this is a model pressure, the positive says is vertical and formula_terms says
+         ! this is a parametric quantity. Exclude files with certain non-CF units for backwards compatibility.
          if (coord_var%is_attribute_present("positive") .and. coord_var%is_attribute_present("formula_terms") &
               .and. .not. any(temp_units == ["1    ", "level"]) ) then
             standard_name = coord_var%get_attribute_string("standard_name") 
             formula_terms = coord_var%get_attribute_string("formula_terms")
             if (standard_name == "atmosphere_hybrid_sigma_pressure_coordinate") then
+
+               ! Set positive and exit if certain non-CF units, for backwards compatibility
+               if ( any(temp_units == ["1    ", "level"]) ) then
+                  vertical_coord%positive = "up"
+                  if (vertical_coord%levels(1) >= vertical_coord%levels(2)) then
+                     vertical_coord%positive = "down"
+                  endif
+                  _RETURN(_SUCCESS)
+               endif
+
                ! do we have bounds, if so this is centers
                source_file = metadata%get_source_file()
                if (coord_var%is_attribute_present('bounds')) then
