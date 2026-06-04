@@ -87,16 +87,21 @@ contains
          end if
          call iter%next()
       end do
-      ! if not blank, we found something that "looks" like a vertical coordinate according to cf, now lets fill it out
+
+      ! if not blank, we found something that "looks" like a vertical coordinate according to cf,
+      ! now lets fill it out
       if (lev_name /= '') then
          coord_var => metadata%get_coordinate_variable(lev_name, _RC)
          vertical_coord%levels = get_coords(coord_var,_RC) 
          vertical_coord%num_levels = size(vertical_coord%levels)
 
-         if (coord_var%is_attribute_present("positive")) vertical_coord%positive = coord_var%get_attribute_string("positive")
-         if (coord_var%is_attribute_present("units"))  temp_units = coord_var%get_attribute_string("units")
+         if (coord_var%is_attribute_present("positive")) &
+              vertical_coord%positive = coord_var%get_attribute_string("positive")
+         if (coord_var%is_attribute_present("units")) &
+              temp_units = coord_var%get_attribute_string("units")
 
-         ! now test if this is a "fixed" pressure level, if has units of pressure, then CF says is pressure dimensional coordinate
+         ! now test if this is a "fixed" pressure level. If has units of pressure, then CF says is
+         ! pressure dimensional coordinate.
          has_pressure_units = safe_are_convertible(temp_units, 'hPa', _RC)
          if (has_pressure_units) then
             vertical_coord%level_units = temp_units
@@ -105,8 +110,8 @@ contains
             _RETURN(_SUCCESS)
          end if
 
-         ! now test if no positive attribute and does not have pressure units
-         ! for backwards compatibility with non-cf files
+         ! now test if no positive attribute and does not have pressure units,
+         ! to set vertical coordinate direction for backwards compatibility with non-cf files
          if ((.not. coord_var%is_attribute_present("positive")) .and. &
               (.not. has_pressure_units)) then
             long_name = coord_var%get_attribute_string("long_name")
@@ -122,19 +127,33 @@ contains
             endif
          endif
 
-         ! now test if this is a "fixed" height level, if has height units, then dimensioanl coordinate, but must have positive 
+         ! now test if this is a "fixed" height level, if has height units, then dimensional
+         ! coordinate, but must have positive
          has_height_units = safe_are_convertible(temp_units, 'm', _RC)
          if (has_height_units) then
-            _ASSERT(allocated(vertical_coord%positive),"non pressure veritcal dimensional coordinates must have positive attribute")
+            _ASSERT(allocated(vertical_coord%positive),"non pressure vertical dimensional coordinates must have positive attribute")
             vertical_coord%level_units = temp_units
             vertical_coord%vertical_type = fixed_height
             _RETURN(_SUCCESS)
          end if
-         ! now test if this is a model pressure, the positive says is vertical and formula_terms says, this is a parametric quantity
-         if (coord_var%is_attribute_present("positive") .and. coord_var%is_attribute_present("formula_terms")) then
+
+         ! now test if this is a model pressure, the positive says is vertical and formula_terms says
+         ! this is a parametric quantity. Exclude files with certain non-CF units for backwards compatibility.
+         if (coord_var%is_attribute_present("positive") .and. coord_var%is_attribute_present("formula_terms") &
+              .and. .not. any(temp_units == ["1    ", "level"]) ) then
             standard_name = coord_var%get_attribute_string("standard_name") 
             formula_terms = coord_var%get_attribute_string("formula_terms")
             if (standard_name == "atmosphere_hybrid_sigma_pressure_coordinate") then
+
+               ! Set positive and exit if certain non-CF units, for backwards compatibility
+               if ( any(temp_units == ["1    ", "level"]) ) then
+                  vertical_coord%positive = "up"
+                  if (vertical_coord%levels(1) >= vertical_coord%levels(2)) then
+                     vertical_coord%positive = "down"
+                  endif
+                  _RETURN(_SUCCESS)
+               endif
+
                ! do we have bounds, if so this is centers
                source_file = metadata%get_source_file()
                if (coord_var%is_attribute_present('bounds')) then

@@ -82,7 +82,7 @@ contains
          current_file = this%file_template
          if (get_left) then
             call this%get_time_on_file(current_file,target_time,'L',time_index,time,_RC)
-            _ASSERT(time_index/=time_not_found,"Time not found in file")
+            _ASSERT(time_index/=time_not_found,"Time not found in file "//trim(current_file))
             call bracket%set_node('L',file=current_file,time_index=time_index,time=time,was_set=.true.,_RC)
             if (in_range .and. (bracket%left_node == bracket%right_node)) then
                call bracket%swap_node_fields(rc=status)
@@ -93,7 +93,7 @@ contains
          end if
          if (get_right) then
             call this%get_time_on_file(current_file,target_time,'R',time_index,time,_RC)
-            _ASSERT(time_index/=time_not_found,"Time not found in file")
+            _ASSERT(time_index/=time_not_found,"Time not found in file "//trim(current_file))
             call bracket%set_node('R',file=current_file,time_index=time_index,time=time,was_set=.true.,_RC)
             bracket%new_file_right=.true.
          end if
@@ -117,7 +117,7 @@ contains
                      if (allow_missing_file) then
                         time = ghost_time
                      else
-                        _FAIL("Time not found in file")
+                        _FAIL("Time not found in file"//trim(current_file))
                      end if
                   end if
                end if
