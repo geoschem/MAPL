@@ -46,15 +46,21 @@ contains
       type(CapOptions) :: options
       integer :: status
 
+      _HERE, "Starting mapl_run_driver: calling make_cap_options"
       options = make_cap_options(hconfig, is_model_pet, _RC)
+      _HERE, "Calling make_clock"
       clock = make_clock(hconfig, options%lgr, _RC)
+      _HERE, "Calling make_driver"
       driver = make_driver(clock, hconfig, options, _RC)
 
       _RETURN_UNLESS(is_model_pet)
 
       ! TODO `initialize_phases` should be a MAPL procedure (name)
+      _HERE, "Calling mapl_DriverInializePhases"
       call mapl_DriverInitializePhases(driver, phases=GENERIC_INIT_PHASE_SEQUENCE, _RC)
+      _HERE, "Calling integrate"
       call integrate(driver, options%checkpointing, options%lgr, _RC)
+      _HERE, "Caling driver%finalize"
       call driver%finalize(_RC)
 
       _RETURN(_SUCCESS)
@@ -175,12 +181,15 @@ contains
       type(esmf_GridComp) :: cap_gridcomp
       integer :: status, user_status
       integer, allocatable :: petList(:)
-      
-      petList = get_model_pets(options%is_model_pet, _RC)
 
+      _HERE, 'Calling get_model_pets'
+      petList = get_model_pets(options%is_model_pet, _RC)
+      _HERE, 'Calling mapl_GridCompCreate'
       cap_gridcomp = mapl_GridCompCreate(options%name, user_setservices(cap_setservices), hconfig, petList=petList, _RC)
+      _HERE, 'Calling esmf_GridCompSetServices'
       call esmf_GridCompSetServices(cap_gridcomp, generic_setServices, _USERRC)
 
+      _HERE, 'Calling Gridded ComponentDriver'
       driver = GriddedComponentDriver(cap_gridcomp, clock=clock)
 
       _RETURN(_SUCCESS)

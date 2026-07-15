@@ -32,14 +32,19 @@ contains
       class(Logger), pointer :: lgr
       character(:), allocatable :: this_name
 
+      _HERE, 'Child name is '//child_name
       _ASSERT(is_valid_name(child_name), 'Child name <' // child_name //'> does not conform to GEOS standards.')
+      _HERE, 'Child name is valid'
       _ASSERT(this%children%count(child_name) == 0, 'duplicate child name: <'//child_name//'>.')
+       _HERE, 'No duplicate child names'
 
       total_hconfig = merge_hconfig(this%hconfig, child_spec%hconfig, _RC)
+      _HERE, 'Calling MAPL_GridCompCreate'
       child_outer_gc = MAPL_GridCompCreate(child_name, child_spec%user_setservices, total_hconfig, _RC)
 
       ! Meta stuff
       child_meta => get_outer_meta(child_outer_gc, _RC)
+      _HERE, 'calling registry%add_subregistry'
       call this%registry%add_subregistry(child_meta%get_registry())
 
       if (allocated(child_spec%timeStep)) child_meta%user_timeStep = child_spec%timeStep
@@ -47,6 +52,7 @@ contains
       child_meta%user_offset = this%user_offset + child_spec%offset
 
       child_driver = GriddedComponentDriver(child_outer_gc)
+      _HERE, 'calling children%insert'
       call this%children%insert(child_name, child_driver)
 
       lgr => this%get_logger()

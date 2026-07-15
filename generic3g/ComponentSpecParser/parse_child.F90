@@ -25,6 +25,7 @@ contains
       type(ESMF_TimeInterval), allocatable :: offset
       type(ESMF_TimeInterval), allocatable :: timeStep
 
+      _HERE, 'Start of parse_child'
       dso_found = .false.
       ! Ensure precisely one name is used for dso
       do i = 1, size(dso_keys)
@@ -56,11 +57,13 @@ contains
       has_config_file = ESMF_HconfigIsDefined(hconfig, keyString='config_file', _RC)
       if (has_config_file) then
          config_file = ESMF_HconfigAsString(hconfig, keyString='config_file',_RC)
+         _HERE, 'Calling ESMF_HConfigCreate for '//config_file
          child_hconfig = ESMF_HConfigCreate(filename=config_file,_RC)
       end if
 
       setservices = user_setservices(sharedObj, userProcedure)
 
+      _HERE, 'Calling parse_timespec'
       call parse_timespec(hconfig, timeStep, offset, _RC)
 
       child = ChildSpec(setservices, hconfig=child_hconfig, timeStep=timeStep, offset=offset)
