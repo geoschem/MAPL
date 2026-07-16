@@ -2,12 +2,15 @@
 ! attributes across couplers as well as to provide guidance to the
 ! containt Action objects on when to recompute internal items.
 
-#include "MAPL_Exceptions.h"
+#include "MAPL.h"
+
 module mapl3g_FieldDelta
+
    use mapl3g_FieldInfo
    use mapl3g_FieldGet
    use mapl3g_VerticalStaggerLoc
    use mapl3g_InfoUtilities
+   use mapl3g_FieldFill, only: FieldFill
    use mapl_FieldPointerUtilities
    use mapl_ErrorHandling
    use mapl_KeywordEnforcer
@@ -27,9 +30,6 @@ module mapl3g_FieldDelta
       ! info attributes
       integer, allocatable :: num_levels
       character(:), allocatable :: units
-
-!#      logical :: geom_coords_changed = .false.
-!#      logical :: vgrid_coords_changed = .false.
    contains
       procedure :: initialize_field_delta
       procedure :: initialize_field_delta_degenerate
@@ -41,11 +41,9 @@ module mapl3g_FieldDelta
       procedure :: reallocate_fields
    end type FieldDelta
 
-
    interface FieldDelta
       procedure new_FieldDelta
    end interface FieldDelta
-
 
 contains
 
@@ -75,9 +73,9 @@ contains
 
    end function new_FieldDelta
 
-
    ! delta = f_b - f_a
-   subroutine initialize_field_delta(this, f_a, f_b, rc) 
+   subroutine initialize_field_delta(this, f_a, f_b, rc)
+
       class(FieldDelta), intent(out) :: this
       type(ESMF_Field), intent(in) :: f_a
       type(ESMF_Field), intent(in) :: f_b
@@ -87,11 +85,9 @@ contains
 
       call compute_geom_delta(this%geom, f_a, f_b, _RC)
       call compute_typekind_delta(this%typekind, f_a, f_b, _RC)
-      call compute_num_levels_delta(this%num_levels, f_a, f_b, _RC)
       call compute_units_delta(this%units, f_a, f_b, _RC)
 
       _RETURN(_SUCCESS)
-
 
    contains
 
@@ -112,7 +108,6 @@ contains
           end if
 
          _RETURN(_SUCCESS)
-
       end subroutine compute_geom_delta
 
       subroutine compute_typekind_delta(typekind, f_a, f_b, rc)
@@ -132,28 +127,7 @@ contains
          end if
 
          _RETURN(_SUCCESS)
-
       end subroutine compute_typekind_delta
-
-      subroutine compute_num_levels_delta(num_levels, f_a, f_b, rc)
-         integer, allocatable, intent(out) :: num_levels
-         type(ESMF_Field), intent(in) :: f_a
-         type(ESMF_Field), intent(in) :: f_b
-         integer, optional, intent(out) :: rc
-
-         integer :: status
-         integer :: num_levels_a, num_levels_b
-
-         call FieldGet(f_a, num_levels=num_levels_a, _RC)
-         call FieldGet(f_b, num_levels=num_levels_b, _RC)
-
-          if (num_levels_a /= num_levels_b) then
-              num_levels = num_levels_b
-          end if
-
-         _RETURN(_SUCCESS)
-
-      end subroutine compute_num_levels_delta
 
       subroutine compute_units_delta(units, f_a, f_b, rc)
          character(:), allocatable, intent(out) :: units
@@ -173,7 +147,6 @@ contains
          end if
 
          _RETURN(_SUCCESS)
-
       end subroutine compute_units_delta
 
    end subroutine initialize_field_delta
@@ -191,16 +164,13 @@ contains
       allocate(this%typekind)
       call ESMF_FieldGet(f, geom=this%geom, typekind=typekind, _RC)
 
-      allocate(this%num_levels)
-      call FieldGet(f, num_levels=this%num_levels, units=this%units, _RC)
+      call FieldGet(f, units=this%units, _RC)
 
       _RETURN(_SUCCESS)
    end subroutine initialize_field_delta_degenerate
 
-   
-
-
    subroutine update_field(this, field, ignore, rc)
+
       class(FieldDelta), intent(in) :: this
       type(ESMF_Field), intent(inout) :: field
       character(*), intent(in), optional :: ignore
@@ -214,29 +184,11 @@ contains
 
       call this%reallocate_field(field, ignore=ignore_, _RC)
 
-      call update_num_levels(this%num_levels, field, ignore=ignore_, _RC)
       call update_units(this%units, field, ignore=ignore_, _RC)
 
       _RETURN(_SUCCESS)
+
    contains
-
-      subroutine update_num_levels(num_levels, field, ignore, rc)
-         integer, optional, intent(in) :: num_levels
-         type(ESMF_Field), intent(inout) :: field
-         character(*), intent(in) :: ignore
-         integer, optional, intent(out) :: rc
-
-         integer :: status
-         type(ESMF_Info) :: info
-
-         _RETURN_UNLESS(present(num_levels))
-         _RETURN_IF(ignore == 'num_levels')
-
-         call ESMF_InfoGetFromHost(field, info, _RC)
-         call FieldInfoSetInternal(info, num_levels=num_levels, _RC)
-
-         _RETURN(_SUCCESS)
-      end subroutine update_num_levels
 
       subroutine update_units(units, field, ignore, rc)
          character(*), optional, intent(in) :: units
@@ -275,6 +227,7 @@ contains
    end subroutine update_fields
 
    subroutine reallocate_field(this, field, ignore, unusable, rc)
+
       class(FieldDelta), intent(in) :: this
       type(ESMF_Field), intent(inout) :: field
       character(*), optional, intent(in) :: ignore
@@ -285,10 +238,10 @@ contains
 
       type(ESMF_Geom) :: current_geom, geom
       type(ESMF_TypeKind_Flag) :: current_typekind, typekind
-      
-      integer :: i, rank
+
+      integer :: i
       integer, allocatable :: ungriddedLBound(:), ungriddedUBound(:)
-      integer, allocatable :: localElementCount(:), current_ungriddedUBound(:)
+      integer, allocatable :: localElementCount(:)
       character(:), allocatable :: ignore_
       logical :: new_array
       type(ESMF_FieldStatus_Flag) :: field_status
@@ -296,7 +249,6 @@ contains
       new_array = .false.
       ignore_ = ''
       if (present(ignore)) ignore_ = ignore
-
 
       call ESMF_FieldGet(field, status=field_status, _RC)
       _ASSERT(field_status == ESMF_FIELDSTATUS_COMPLETE, 'field must at least have a geom.')
@@ -315,10 +267,13 @@ contains
       call ESMF_FieldEmptyReset(field, status=ESMF_FIELDSTATUS_EMPTY, _RC)
       call ESMF_FieldEmptySet(field, geom, _RC)
 
-      call ESMF_FieldEmptyComplete(field, &
-           typekind=typekind, &
-           ungriddedLBound=ungriddedLBound, ungriddedUbound=ungriddedUBound, &
-           _RC)
+       call ESMF_FieldEmptyComplete(field, &
+            typekind=typekind, &
+            ungriddedLBound=ungriddedLBound, ungriddedUbound=ungriddedUBound, &
+            _RC)
+
+      ! Initialize field with appropriate sentinel values to catch uninitialized data usage
+      call FieldFill(field, _RC)
 
       _RETURN(_SUCCESS)
 
@@ -330,7 +285,7 @@ contains
          type(ESMF_Geom), optional, intent(in) :: new_geom
          character(*), intent(in) :: ignore
          logical, intent(inout) :: new_array
-         
+
          geom = current_geom
 
          if (ignore == 'geom') return
@@ -338,7 +293,6 @@ contains
 
          new_array = new_array .or. (new_geom /= current_geom)
          geom = new_geom
-
       end subroutine select_geom
 
       subroutine select_typekind(typekind, current_typekind, new_typekind, ignore, new_array)
@@ -347,7 +301,7 @@ contains
          type(ESMF_TypeKind_Flag), optional, intent(in) :: new_typekind
          character(*), intent(in) :: ignore
          logical, intent(inout) :: new_array
-         
+
          typekind = current_typekind
 
          if (ignore == 'typekind') return
@@ -355,7 +309,6 @@ contains
 
          new_array = new_array .or. (new_typekind /= current_typekind)
          typekind = new_typekind
-
       end subroutine select_typekind
 
       subroutine select_ungriddedUbound(ungriddedUbound, field, new_num_levels, ignore, new_array, rc)
@@ -389,18 +342,17 @@ contains
          ! Surface fields are not impacted by change in vertical grid
          _RETURN_IF(vert_staggerloc == VERTICAL_STAGGER_NONE)
 
-
          call FieldGet(field, num_levels=current_num_levels, _RC)
          _ASSERT(count(vert_staggerloc == [VERTICAL_STAGGER_CENTER, VERTICAL_STAGGER_EDGE]) == 1, 'unsupported vertical stagger')
-         ungriddedUBound(1) = this%num_levels
+         ungriddedUBound(1) = new_num_levels
 
-         new_array = new_array .or. (this%num_levels /= current_num_levels)
+         new_array = new_array .or. (new_num_levels /= current_num_levels)
 
          _RETURN(_SUCCESS)
+         _UNUSED_DUMMY(unusable)
       end subroutine select_ungriddedUbound
-      
-   end subroutine reallocate_field
 
+   end subroutine reallocate_field
 
    subroutine reallocate_fields(this, fieldList, ignore, rc)
       class(FieldDelta), intent(in) :: this

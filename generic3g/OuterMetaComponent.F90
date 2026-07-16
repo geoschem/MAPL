@@ -1,6 +1,7 @@
 #include "MAPL.h"
 
 module mapl3g_OuterMetaComponent
+
    use mapl3g_UserSetServices, only: AbstractUserSetServices
    use mapl3g_ComponentSpec
    use mapl3g_VariableSpec
@@ -17,10 +18,11 @@ module mapl3g_OuterMetaComponent
    use mapl3g_SimpleAlarm
    use gFTL2_StringVector
    use mapl_keywordEnforcer, only: KE => KeywordEnforcer
+   use MAPL_Profiler, only: DistributedProfiler
    use esmf
    use pflogger, only: Logger
 
-   implicit none
+   implicit none(type,external)
    private
 
    public :: OuterMetaComponent
@@ -56,6 +58,9 @@ module mapl3g_OuterMetaComponent
       integer :: counter
 
       type(SimpleAlarm) :: user_run_alarm
+      type(DistributedProfiler) :: profiler
+
+      logical :: run_if_alarm_rings_next
 
    contains
 
@@ -91,6 +96,9 @@ module mapl3g_OuterMetaComponent
       procedure :: finalize
       procedure :: write_restart
 
+      procedure :: start_timer
+      procedure :: stop_timer
+
       ! Hierarchy
       procedure, private :: add_child_by_spec
       procedure, private :: get_child_by_name
@@ -122,7 +130,6 @@ module mapl3g_OuterMetaComponent
    type OuterMetaWrapper
       type(OuterMetaComponent), pointer :: outer_meta
    end type OuterMetaWrapper
-
 
    interface get_outer_meta
       module procedure :: get_outer_meta_from_outer_gc
@@ -285,16 +292,16 @@ module mapl3g_OuterMetaComponent
 
      module recursive subroutine initialize_modify_advertised(this, importState, exportState, clock, unusable, rc)
          class(OuterMetaComponent), target, intent(inout) :: this
-         ! optional arguments
          type(ESMF_State) :: importState
          type(ESMF_State) :: exportState
          type(ESMF_Clock) :: clock
+         ! optional arguments
          class(KE), optional, intent(in) :: unusable
          integer, optional, intent(out) :: rc
       end subroutine initialize_modify_advertised
 
       module recursive subroutine initialize_realize(this, importState, exportState, clock, unusable, rc)
-         class(OuterMetaComponent), intent(inout) :: this
+         class(OuterMetaComponent), target, intent(inout) :: this
          type(ESMF_State) :: importState
          type(ESMF_State) :: exportState
          type(ESMF_Clock) :: clock
@@ -335,7 +342,7 @@ module mapl3g_OuterMetaComponent
       end subroutine initialize_user
 
       module subroutine run_custom(this, method_flag, phase_name, rc)
-         class(OuterMetaComponent), intent(inout) :: this
+         class(OuterMetaComponent), target, intent(inout) :: this
          type(ESMF_METHOD_FLAG), intent(in) :: method_flag
          character(*), intent(in) :: phase_name
          integer, optional, intent(out) :: rc
@@ -378,6 +385,18 @@ module mapl3g_OuterMetaComponent
          integer, optional, intent(out) :: rc
       end subroutine write_restart
 
+      module subroutine start_timer(this, name, rc)
+         class(OuterMetaComponent), intent(inout) :: this
+         character(len=*), intent(in) :: name
+         integer, optional, intent(out) :: rc
+      end subroutine start_timer
+
+      module subroutine stop_timer(this, name, rc)
+         class(OuterMetaComponent), intent(inout) :: this
+         character(len=*), intent(in) :: name
+         integer, optional, intent(out) :: rc
+      end subroutine stop_timer
+
       module function get_name(this, rc) result(name)
          character(:), allocatable :: name
          class(OuterMetaComponent), intent(in) :: this
@@ -400,8 +419,8 @@ module mapl3g_OuterMetaComponent
       end subroutine set_vertical_grid
 
       module function get_vertical_grid(this) result(vertical_grid)
-         class(VerticalGrid), allocatable :: verticaL_grid
-         class(OuterMetaComponent), intent(inout) :: this
+         class(VerticalGrid), pointer :: verticaL_grid
+         class(OuterMetaComponent), target, intent(inout) :: this
       end function get_vertical_grid
 
       module function get_registry(this) result(registry)
@@ -453,12 +472,11 @@ module mapl3g_OuterMetaComponent
          integer, optional, intent(out) :: rc
       end function get_checkpoint_subdir
 
-   end interface
+   end interface ! submodule interfaces
 
    interface OuterMetaComponent
       module procedure new_outer_meta
    end interface OuterMetaComponent
-
 
    interface recurse
       module procedure recurse_
@@ -499,6 +517,7 @@ contains
          this%component_spec%misc%restart_controls = restart_controls
       end if
 
+      _UNUSED_DUMMY(unusable)
    end subroutine set_misc
 
 end module mapl3g_OuterMetaComponent

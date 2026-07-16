@@ -17,6 +17,7 @@ module MAPL_FieldUtilities
    public :: FieldSet
    public :: FieldNegate
    public :: FieldPow
+   public :: FieldsDestroy
 
    interface FieldIsConstant
       procedure FieldIsConstantR4
@@ -27,6 +28,10 @@ module MAPL_FieldUtilities
       procedure FieldSet_R4
       procedure FieldSet_R8
    end interface FieldSet
+
+   interface FieldsDestroy
+      procedure :: destroy_fields
+   end interface FieldsDestroy
 
 contains
 
@@ -91,6 +96,7 @@ contains
       type(ESMF_TYPEKIND_FLAG) :: type_kind
       real(kind=ESMF_KIND_R4), pointer :: f_ptr_r4(:)
       real(kind=ESMF_KIND_R8), pointer :: f_ptr_r8(:)
+      integer(kind=ESMF_KIND_I4), pointer :: f_ptr_i4(:)
       integer :: status
 
       call ESMF_FieldGet(field,typekind=type_kind,_RC)
@@ -100,6 +106,9 @@ contains
       else if (type_kind == ESMF_TYPEKIND_R8) then
          call assign_fptr(field,f_ptr_r8,_RC)
          f_ptr_r8 = constant_val
+      else if (type_kind == ESMF_TYPEKIND_I4) then
+         call assign_fptr(field,f_ptr_i4,_RC)
+         f_ptr_i4 = constant_val
       else
          _FAIL('unsupported typekind')
       end if
@@ -114,6 +123,7 @@ contains
       type(ESMF_TYPEKIND_FLAG) :: type_kind
       real(kind=ESMF_KIND_R4), pointer :: f_ptr_r4(:)
       real(kind=ESMF_KIND_R8), pointer :: f_ptr_r8(:)
+      integer(kind=ESMF_KIND_I4), pointer :: f_ptr_i4(:)
       integer :: status
 
       call ESMF_FieldGet(field,typekind=type_kind,_RC)
@@ -123,6 +133,9 @@ contains
       else if (type_kind == ESMF_TYPEKIND_R8) then
          call assign_fptr(field,f_ptr_r8,_RC)
          f_ptr_r8 = constant_val
+      else if (type_kind == ESMF_TYPEKIND_I4) then
+         call assign_fptr(field,f_ptr_i4,_RC)
+         f_ptr_i4 = constant_val
       else
          _FAIL('unsupported typekind')
       end if
@@ -228,7 +241,21 @@ contains
       _RETURN(ESMF_SUCCESS)
    end subroutine FieldPow
 
+   subroutine destroy_fields(fields, rc)
+      type(ESMF_Field), intent(inout) :: fields(:)
+      integer, optional, intent(out) :: rc
+      integer :: status, i, get_status
+      character(len=ESMF_MAXSTR) :: name
+
+      do i=1, size(fields)
+         call ESMF_FieldGet(fields(i), name=name, rc=get_status)
+         if (get_status /= ESMF_SUCCESS) name = '<unnamed>'
+         call ESMF_FieldDestroy(fields(i), _RC)
+         call ESMF_FieldValidate(fields(i), rc=status)
+         _ASSERT(status /= ESMF_SUCCESS, 'Field "' // trim(name) // '" was not destroyed.')
+      end do
+
+      _RETURN(_SUCCESS)
+   end subroutine destroy_fields
 
 end module MAPL_FieldUtilities
-
-

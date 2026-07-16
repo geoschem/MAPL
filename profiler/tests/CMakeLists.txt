@@ -7,6 +7,7 @@ set (TEST_SRCS
   test_PercentageColumn.pf
   test_TimeProfiler.pf
   test_ProfileReporter.pf
+  test_CsvProfileReporter.pf
   test_MeterNode.pf
   test_MeterNodeIterator.pf
   test_DistributedMeter.pf
@@ -22,6 +23,10 @@ add_pfunit_ctest (
   MAX_PES 8
   )
 set_target_properties(MAPL.profiler.tests PROPERTIES Fortran_MODULE_DIRECTORY ${MODULE_DIRECTORY})
+target_include_directories(MAPL.profiler.tests PRIVATE
+  ${esma_include}/MAPL.pfunit
+  ${esma_include}/MAPL.profiler
+  ${esma_include}/MAPL.shared)
 set_tests_properties(MAPL.profiler.tests PROPERTIES LABELS "ESSENTIAL")
 
 if(${GEOS_SITE} STREQUAL "NCCS" AND ${MPI_STACK} STREQUAL "intelmpi")

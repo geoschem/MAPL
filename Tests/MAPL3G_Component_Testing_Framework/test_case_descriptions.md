@@ -18,10 +18,14 @@ Note all test cases are in a numbered directory caseX, where a X is an integer a
 15. Testing that we can take a climatology for a non-leap year and interpolate to a non-leap year. Daily files each with 1 value for 2007 (non-leap year). Interpolate to 03/29/2006 (leap year)
 16. Testing that we can take a climatology for a leap year and interpolate to a non-leap year. Daily files each with 1 value for 2008 (leap year). Interpolate to 03/29/2006 15z (leap year)
 17. Test ability of ExtData (2G only) to allow for subconfigs, i.e. split input yaml files into multiple files
+18. Test vector regridding
 19. Test set file to /dev/null
+21. Test derived export to create sum of 2 variables
 22. Test multiple rules for an item
 23. Test multiple datasets and treat Climatology in the first and a real-time in the 2nd
 24. Test ability to read and write cubed-sphere files
 30. Case1 with deflate compression
 39. Test adding a scaling and offset to an item
 40. Test fractional regridding, ensure fractions of c24 cells regridded to c12 add up to 1
+41. Test History for ability to output daily averages
+42. Test of Historys ability to output monthly and djf averages

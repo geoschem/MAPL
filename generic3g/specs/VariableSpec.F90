@@ -1,6 +1,7 @@
 #include "MAPL.h"
 
 module mapl3g_VariableSpec
+
    use mapl3g_StateItemSpec
    use mapl3g_StateItemAspect
    use mapl3g_GeomAspect
@@ -11,6 +12,7 @@ module mapl3g_VariableSpec
    use mapl3g_StateClassAspect
    use mapl3g_VectorClassAspect
    use mapl3g_BracketClassAspect
+   use mapl3g_VectorBracketClassAspect
    use mapl3g_WildcardClassAspect
    use mapl3g_ServiceClassAspect
    use mapl3g_ExpressionClassAspect
@@ -19,22 +21,29 @@ module mapl3g_VariableSpec
    use mapl3g_AttributesAspect
    use mapl3g_UngriddedDimsAspect
    use mapl3g_VerticalGridAspect
+   use mapl3g_VerticalAlignment
    use mapl3g_VerticalRegridMethod
-   use mapl3g_FrequencyAspect
    use mapl3g_TypekindAspect
+   use mapl3g_QuantityTypeAspect
+   use mapl3g_ConservationAspect
+   use mapl3g_NormalizationAspect
+   use mapl3g_NormalizationType
    use mapl3g_UngriddedDims
    use mapl3g_VerticalStaggerLoc
+   use mapl3g_VectorBasisKind
    use mapl3g_HorizontalDimsSpec
    use mapl3g_VirtualConnectionPt
    use mapl3g_ActualConnectionPt
    use mapl3g_VerticalGrid
    use mapl3g_VirtualConnectionPtVector
    use mapl_ErrorHandling
+   use pflogger, only: logging, logger_t => logger
    use mapl3g_StateRegistry
    use mapl3g_StateItem
    use mapl3g_AspectId
    use mapl3g_EsmfRegridder, only: EsmfRegridderParam
    use mapl3g_FieldDictionary
+   use mapl3g_FieldDictionaryItem, only: FieldDictionaryItem
    use mapl_KeywordEnforcerMod
    use mapl3g_RestartModes, only: RestartMode
    use esmf
@@ -73,10 +82,8 @@ module mapl3g_VariableSpec
       ! Vector
       !---------------------
       type(StringVector) :: vector_component_names ! default empty
-      real(kind=ESMF_KIND_R4), allocatable :: default_value
-      ! Todo: implement these
-      ! type(VectorOrientation_Flag), allocatable :: vectororientation
-      ! type(ArakawaStagger_Flag), allocatable :: arakawa_stagger
+      type(VectorBasisKind), allocatable :: vector_basis_kind
+      real(kind=ESMF_KIND_R4), allocatable :: fill_value
       !---------------------
       ! Bracket
       !---------------------
@@ -110,19 +117,12 @@ module mapl3g_VariableSpec
       !=====================
       class(VerticalGrid), allocatable :: vertical_grid
       type(VerticalStaggerLoc), allocatable :: vertical_stagger
+      character(:), allocatable :: vertical_alignment  ! "upward" | "downward" | "with_grid" (default)
 
       !=====================
       ! units aspect
       !=====================
       character(:), allocatable :: units ! from FieldDictionary or override
-
-      !=====================
-      ! frequency aspect
-      !=====================
-      ! TODO: Should be an enum
-      character(:), allocatable :: accumulation_type
-      type(ESMF_TimeInterval), allocatable :: timeStep
-      type(ESMF_TimeInterval), allocatable :: offset
 
       !=====================
       ! ungridded_dims aspect
@@ -138,6 +138,7 @@ module mapl3g_VariableSpec
       !=====================
       type(StringVector) :: dependencies ! default empty
       logical :: has_deferred_aspects = .false.
+      logical :: use_field_dictionary = .false.
 
    contains
       procedure :: make_virtualPt
@@ -150,8 +151,10 @@ module mapl3g_VariableSpec
       procedure :: make_GeomAspect
       procedure :: make_UngriddedDimsAspect
       procedure :: make_AttributesAspect
+      procedure :: make_QuantityTypeAspect
+      procedure :: make_ConservationAspect
+      procedure :: make_NormalizationAspect
       procedure :: make_VerticalGridAspect
-      procedure :: make_FrequencyAspect
       procedure :: make_ClassAspect
    end type VariableSpec
 
@@ -160,14 +163,16 @@ contains
    function make_VariableSpec( &
         state_intent, short_name, unusable, &
         standard_name, &
+        long_name, &
         geom, &
         units, &
         itemtype, &
         typekind, &
         vertical_grid, &
         vertical_stagger, &
+        vertical_alignment, &
         ungridded_dims, &
-        default_value, &
+        fill_value, &
         service_items, &
         attributes, &
         bracket_size, &
@@ -175,11 +180,10 @@ contains
         dependencies, &
         regrid_param, &
         horizontal_dims_spec, &
-        accumulation_type, &
-        timeStep, &
-        offset, &
         vector_component_names, &
+        vector_basis_kind, &
         has_deferred_aspects, &
+        use_field_dictionary, &
         restart_mode, &
         rc) result(var_spec)
 
@@ -189,6 +193,7 @@ contains
       ! Optional args:
       class(KeywordEnforcer), optional, intent(in) :: unusable
       character(*), optional, intent(in) :: standard_name
+      character(*), optional, intent(in) :: long_name
       type(ESMF_Geom), optional, intent(in) :: geom
       character(*), optional, intent(in) :: units
       character(*), optional, intent(in) :: expression
@@ -196,27 +201,28 @@ contains
       type(ESMF_TypeKind_Flag), optional, intent(in) :: typekind
       class(VerticalGrid), optional, intent(in) :: vertical_grid
       type(VerticalStaggerLoc), optional, intent(in) :: vertical_stagger
+      character(*), optional, intent(in) :: vertical_alignment
       type(UngriddedDims), optional, intent(in) :: ungridded_dims
-      real, optional, intent(in) :: default_value
+      real, optional, intent(in) :: fill_value
       type(StringVector), optional :: service_items
       type(StringVector), optional, intent(in) :: attributes
       integer, optional, intent(in) :: bracket_size
       type(StringVector), optional, intent(in) :: dependencies
       type(EsmfRegridderParam), optional, intent(in) :: regrid_param
       type(HorizontalDimsSpec), optional, intent(in) :: horizontal_dims_spec
-      character(len=*), optional, intent(in) :: accumulation_type
-      type(ESMF_TimeInterval), optional, intent(in) :: timeStep
-      type(ESMF_TimeInterval), optional, intent(in) :: offset
       type(StringVector), optional, intent(in) :: vector_component_names
+      character(*), optional, intent(in) :: vector_basis_kind
       logical, optional, intent(in) :: has_deferred_aspects
+      logical, optional, intent(in) :: use_field_dictionary
       type(RestartMode), optional, intent(in) :: restart_mode
       integer, optional, intent(out) :: rc
 
 !#      type(ESMF_RegridMethod_Flag), allocatable :: regrid_method
 !#      type(EsmfRegridderParam) :: regrid_param_
+
       integer :: status
 
-      var_spec%short_name = short_name
+       var_spec%short_name = short_name
       var_spec%state_intent = state_intent
 
 #if defined(_SET_OPTIONAL)
@@ -224,6 +230,7 @@ contains
 #endif
 #define _SET_OPTIONAL(opt) if (present(opt)) var_spec%opt = opt
       _SET_OPTIONAL(standard_name)
+      _SET_OPTIONAL(long_name)
       _SET_OPTIONAL(geom)
       _SET_OPTIONAL(units)
       _SET_OPTIONAL(expression)
@@ -231,24 +238,90 @@ contains
       _SET_OPTIONAL(typekind)
       _SET_OPTIONAL(vertical_grid)
       _SET_OPTIONAL(vertical_stagger)
+      _SET_OPTIONAL(vertical_alignment)
       _SET_OPTIONAL(ungridded_dims)
-      _SET_OPTIONAL(default_value)
+      _SET_OPTIONAL(fill_value)
       _SET_OPTIONAL(service_items)
       _SET_OPTIONAL(attributes)
       _SET_OPTIONAL(bracket_size)
       _SET_OPTIONAL(dependencies)
       _SET_OPTIONAL(regrid_param)
       _SET_OPTIONAL(horizontal_dims_spec)
-      _SET_OPTIONAL(accumulation_type)
-      _SET_OPTIONAL(timeStep)
-      _SET_OPTIONAL(offset)
       _SET_OPTIONAL(vector_component_names)
-      _SET_OPTIONAL(has_deferred_aspects)
-      _SET_OPTIONAL(restart_mode)
+       _SET_OPTIONAL(has_deferred_aspects)
+       _SET_OPTIONAL(use_field_dictionary)
+       _SET_OPTIONAL(restart_mode)
+
+       var_spec%vector_basis_kind = VECTOR_BASIS_KIND_NS
+       if (present(vector_basis_kind)) then
+          _ASSERT(any(var_spec%itemType == [MAPL_STATEITEM_VECTOR, MAPL_STATEITEM_VECTORBRACKET]), 'vector_basis_kind can only be specified for vectors')
+          var_spec%vector_basis_kind = VectorBasisKind(vector_basis_kind)
+       end if
+
+      if (var_spec%use_field_dictionary) then
+         call apply_field_dictionary_defaults_(var_spec, short_name, standard_name, units, long_name, _RC)
+      end if
 
       _RETURN(_SUCCESS)
       _UNUSED_DUMMY(unusable)
    end function make_VariableSpec
+
+   ! Apply field dictionary defaults for units and long_name.
+   ! Lookup key priority:
+   !   1. standard_name (if present and not a compound vector name)
+   !   2. short_name as alias
+   ! Caller-supplied units/long_name always take priority over FD defaults.
+   ! Compound vector names of the form "(name1,name2)" are never FD keys.
+   ! A miss is warned about but never fatal.
+   subroutine apply_field_dictionary_defaults_(var_spec, short_name, standard_name, units, long_name, rc)
+      type(VariableSpec), intent(inout) :: var_spec
+      character(*), intent(in) :: short_name
+      character(*), optional, intent(in) :: standard_name
+      character(*), optional, intent(in) :: units
+      character(*), optional, intent(in) :: long_name
+      integer, optional, intent(out) :: rc
+
+      type(FieldDictionary), pointer :: fd
+      type(FieldDictionaryItem) :: dict_item
+      type(logger_t), pointer :: lgr
+      character(:), allocatable :: lookup_key
+      logical :: by_alias
+      integer :: status
+
+      ! Default: look up by short_name as alias
+      lookup_key = short_name
+      by_alias = .true.
+
+      ! Prefer standard_name when present and not a compound vector encoding
+      if (present(standard_name)) then
+         if (index(standard_name, '(') == 0) then
+            lookup_key = standard_name
+            by_alias = .false.
+         end if
+      end if
+
+      fd => get_field_dictionary()
+
+      if (fd%has_item(lookup_key)) then
+         dict_item = fd%get_item(lookup_key, _RC)
+         if (.not. present(units))     var_spec%units     = dict_item%get_units()
+         if (.not. present(long_name)) var_spec%long_name = dict_item%get_long_name()
+         _RETURN(_SUCCESS)
+      end if
+
+      lgr => logging%get_logger('MAPL')
+      if (by_alias) then
+         call lgr%warning('use_field_dictionary=.true. but short_name "' // &
+              short_name // '" not found in field dictionary; ' // &
+              'units and long_name defaults will not be applied.')
+      else
+         call lgr%warning('use_field_dictionary=.true. but standard_name "' // &
+              standard_name // '" not found in field dictionary; ' // &
+              'units and long_name defaults will not be applied.')
+      end if
+
+      _RETURN(_SUCCESS)
+   end subroutine apply_field_dictionary_defaults_
 
    subroutine split_name(encoded_name, name_1, name_2, rc)
       character(*), intent(in) :: encoded_name
@@ -256,7 +329,6 @@ contains
       character(:), allocatable, intent(out) :: name_2
       integer, optional, intent(out) :: rc
 
-      integer :: status
       integer :: idx_open, idx_close, idx_comma
 
       idx_open = index(encoded_name, '(')
@@ -273,7 +345,6 @@ contains
 
       _RETURN(_SUCCESS)
    end subroutine split_name
-
 
    function make_virtualPt(this) result(v_pt)
       type(VirtualConnectionPt) :: v_pt
@@ -298,12 +369,14 @@ contains
       _RETURN(_SUCCESS)
    end function make_dependencies
 
-   function get_regrid_param(requested_param, standard_name) result(regrid_param)
+   function get_regrid_param(requested_param, standard_name, use_field_dictionary) result(regrid_param)
       type(EsmfRegridderParam) :: regrid_param
       type(EsmfRegridderParam), optional, intent(in) :: requested_param
       character(*), optional, intent(in) :: standard_name
+      logical, optional, intent(in) :: use_field_dictionary
 
       type(ESMF_RegridMethod_Flag) :: regrid_method
+      logical :: use_fd
       integer :: status
 
       if (present(requested_param)) then
@@ -311,19 +384,15 @@ contains
          return
       end if
 
-      ! if (NUOPC_FieldDictionaryHasEntry(this%standard_name, rc=status)) then
-      !    call NUOPC_FieldDictionaryGetEntry(this%standard_name, regrid_method, rc=status)
-      !    if (status==ESMF_SUCCESS) then
-      !       this%regrid_param = EsmfRegridderParam(regridmethod=regrid_method)
-      !       return
-      !    end if
-      ! end if
-      regrid_param = EsmfRegridderParam() ! last resort - use default regrid method
+      regrid_param = EsmfRegridderParam() ! default regrid method
+
+      use_fd = .false.
+      if (present(use_field_dictionary)) use_fd = use_field_dictionary
+      if (.not. use_fd) return
 
       regrid_method = get_regrid_method_from_field_dict_(standard_name, rc=status)
       if (status==ESMF_SUCCESS) then
          regrid_param = EsmfRegridderParam(regridmethod=regrid_method)
-         return
       end if
 
    end function get_regrid_param
@@ -333,27 +402,24 @@ contains
       character(*), optional, intent(in) :: standard_name
       integer, optional, intent(out) :: rc
 
-      character(len=*), parameter :: field_dictionary_file = "field_dictionary.yml"
-      type(FieldDictionary) :: field_dict
-      logical :: file_exists
+      type(FieldDictionary), pointer :: fd
       integer :: status
 
-      inquire(file=trim(field_dictionary_file), exist=file_exists)
-      if (.not. file_exists) then
-         rc = _FAILURE
-         return
-      end if
-
-      field_dict = FieldDictionary(filename=field_dictionary_file, _RC)
       if (.not. present(standard_name)) then
          rc = _FAILURE
          return
       end if
-      regrid_method = field_dict%get_regrid_method(standard_name, _RC)
+
+      fd => get_field_dictionary()
+      if (.not. fd%has_item(standard_name)) then
+         rc = _FAILURE
+         return
+      end if
+
+      regrid_method = fd%get_regrid_method(standard_name, _RC)
 
       _RETURN(_SUCCESS)
    end function get_regrid_method_from_field_dict_
-
 
    subroutine add_item(aspects, aspect, rc)
       class(AspectMap), intent(inout) :: aspects
@@ -373,10 +439,14 @@ contains
          call aspects%insert(UNGRIDDED_DIMS_ASPECT_ID, aspect)
       type is (VerticalGridAspect)
          call aspects%insert(VERTICAL_GRID_ASPECT_ID, aspect)
-      type is (FrequencyAspect)
-         call aspects%insert(FREQUENCY_ASPECT_ID, aspect)
       type is (TypekindAspect)
          call aspects%insert(TYPEKIND_ASPECT_ID, aspect)
+      type is (QuantityTypeAspect)
+         call aspects%insert(QUANTITY_TYPE_ASPECT_ID, aspect)
+      type is (ConservationAspect)
+         call aspects%insert(CONSERVATION_ASPECT_ID, aspect)
+      type is (NormalizationAspect)
+         call aspects%insert(NORMALIZATION_ASPECT_ID, aspect)
       class default
          _FAIL('Unsupported type')
       end select
@@ -384,39 +454,34 @@ contains
 
    end subroutine add_item
 
-
-   function make_StateitemSpec(this, registry, component_geom, vertical_grid, unusable, timestep, offset, rc) result(spec)
+   function make_StateitemSpec(this, registry, component_geom, vertical_grid, unusable, rc) result(spec)
       type(StateItemSpec) :: spec
       class(VariableSpec), intent(in) :: this
       type(StateRegistry), pointer, intent(in) :: registry
       type(ESMF_Geom), optional, intent(in) :: component_geom
       class(VerticalGrid), optional, intent(in) :: vertical_grid
       class(KeywordEnforcer), optional, intent(in) :: unusable
-      type(ESMF_TimeInterval), optional, intent(in) :: timestep
-      type(ESMF_TimeInterval), optional, intent(in) :: offset
       integer, optional, intent(out) :: rc
 
       type(AspectMap) :: aspects
       type(VirtualConnectionPtVector) :: dependencies
       integer :: status
 
-      aspects = this%make_aspects(registry, component_geom, vertical_grid, timestep=timestep, offset=offset, _RC)
+      aspects = this%make_aspects(registry, component_geom, vertical_grid, _RC)
       dependencies = this%make_dependencies(_RC)
       spec = new_StateItemSpec(this%state_intent, aspects, dependencies=dependencies, has_deferred_aspects=this%has_deferred_aspects)
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(unusable)
    end function make_StateitemSpec
 
-
-   function make_aspects(this, registry, component_geom, vertical_grid, unusable, timestep, offset, rc) result(aspects)
+   function make_aspects(this, registry, component_geom, vertical_grid, unusable, rc) result(aspects)
       type(AspectMap) :: aspects
       class(VariableSpec), intent(in) :: this
       type(StateRegistry), pointer, intent(in) :: registry
       type(ESMF_Geom), optional, intent(in) :: component_geom
       class(VerticalGrid), optional, intent(in) :: vertical_grid
       class(KeywordEnforcer), optional, intent(in) :: unusable
-      type(ESMF_TimeInterval), optional, intent(in) :: timestep
-      type(ESMF_TimeInterval), optional, intent(in) :: offset
       integer, optional, intent(out) :: rc
 
       integer :: status
@@ -437,17 +502,24 @@ contains
       aspect = this%make_AttributesAspect(_RC)
       call aspects%insert(ATTRIBUTES_ASPECT_ID, aspect)
 
+      aspect = this%make_QuantityTypeAspect(_RC)
+      call aspects%insert(QUANTITY_TYPE_ASPECT_ID, aspect)
+
+      aspect = this%make_ConservationAspect(_RC)
+      call aspects%insert(CONSERVATION_ASPECT_ID, aspect)
+
+      aspect = this%make_NormalizationAspect(_RC)
+      call aspects%insert(NORMALIZATION_ASPECT_ID, aspect)
+
       aspect = this%make_VerticalGridAspect(vertical_grid, &
            component_geom=component_geom, _RC)
       call aspects%insert(VERTICAL_GRID_ASPECT_ID, aspect)
-
-      aspect = this%make_FrequencyAspect(timestep, offset, _RC)
-      call aspects%insert(FREQUENCY_ASPECT_ID, aspect)
 
       aspect = this%make_ClassAspect(registry, _RC)
       call aspects%insert(CLASS_ASPECT_ID, aspect)
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(unusable)
    end function make_aspects
 
    function make_UnitsAspect(this, rc) result(aspect)
@@ -504,6 +576,37 @@ contains
       _RETURN(_SUCCESS)
    end function make_AttributesAspect
 
+   function make_QuantityTypeAspect(this, rc) result(aspect)
+      type(QuantityTypeAspect) :: aspect
+      class(VariableSpec), intent(in) :: this
+      integer, optional, intent(out) :: rc
+
+      ! Create with default (QUANTITY_UNKNOWN) and explicit non-mirror behavior
+      aspect = QuantityTypeAspect()
+      call aspect%set_mirror(.false.)
+      _RETURN(_SUCCESS)
+   end function make_QuantityTypeAspect
+
+   function make_ConservationAspect(this, rc) result(aspect)
+      type(ConservationAspect) :: aspect
+      class(VariableSpec), intent(in) :: this
+      integer, optional, intent(out) :: rc
+
+      ! Create default ConservationAspect (will infer from QuantityType)
+      aspect = ConservationAspect()
+      _RETURN(_SUCCESS)
+   end function make_ConservationAspect
+
+   function make_NormalizationAspect(this, rc) result(aspect)
+      type(NormalizationAspect) :: aspect
+      class(VariableSpec), intent(in) :: this
+      integer, optional, intent(out) :: rc
+
+      ! Create with explicit NORMALIZE_NONE (non-mirror, no normalization needed)
+      aspect = NormalizationAspect(normalization_type=NORMALIZE_NONE, scale_factor=1.0)
+      _RETURN(_SUCCESS)
+   end function make_NormalizationAspect
+
    function make_VerticalGridAspect(this, vertical_grid, component_geom, time_dependent, rc) result(aspect)
       type(VerticalGridAspect) :: aspect
       class(VariableSpec), intent(in) :: this
@@ -531,22 +634,12 @@ contains
          vgrid = vertical_grid
       end if
 
-      aspect = VerticalGridAspect(vertical_grid=vgrid, vertical_stagger=this%vertical_stagger, geom=geom_, &
-           typekind=this%typekind)
+      aspect = VerticalGridAspect(vertical_grid=vgrid, vertical_stagger=this%vertical_stagger, &
+           vertical_alignment=VerticalAlignment(this%vertical_alignment), geom=geom_, typekind=this%typekind)
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(time_dependent)
    end function make_VerticalGridAspect
-
-   function make_FrequencyAspect(this, timestep, offset, rc) result(aspect)
-      type(FrequencyAspect) :: aspect
-      class(VariableSpec), intent(in) :: this
-      type(ESMF_TimeInterval), optional, intent(in) :: timestep
-      type(ESMF_TimeInterval), optional, intent(in) :: offset
-      integer, optional, intent(out) :: rc
-
-      aspect = FrequencyAspect(timestep, offset, this%accumulation_type)
-      _RETURN(_SUCCESS)
-   end function make_FrequencyAspect
 
    function make_ClassAspect(this, registry, rc) result(aspect)
       class(ClassAspect), allocatable :: aspect
@@ -554,28 +647,53 @@ contains
       type(StateRegistry), pointer, optional, intent(in) :: registry
       integer, optional, intent(out) :: rc
 
-      integer :: status
-      character(:), allocatable :: std_name_1, std_name_2
+       integer :: status
+       character(:), allocatable :: std_name_1, std_name_2
+       type(StringVector) :: vector_component_names
+       type(VectorBasisKind) :: basis_kind
 
       select case (this%itemType%ot)
       case (MAPL_STATEITEM_FIELD%ot)
          aspect = FieldClassAspect( &
               standard_name=this%standard_name, &
-              default_value=this%default_value, &
+              fill_value=this%fill_value, &
               restart_mode=this%restart_mode)
       case (MAPL_STATEITEM_FIELDBUNDLE%ot)
          aspect = FieldBundleClassAspect(standard_name=this%standard_name)
       case (MAPL_STATEITEM_STATE%ot)
          aspect = StateClassAspect(state_intent=this%state_intent, standard_name=this%standard_name)
-      case (MAPL_STATEITEM_VECTOR%ot)
-         call split_name(this%standard_name, std_name_1, std_name_2, _RC)
-         aspect = VectorClassAspect(this%vector_component_names, &
-              [ &
-              FieldClassAspect(standard_name=std_name_1, default_value=this%default_value), &
-              FieldClassAspect(standard_name=std_name_2, default_value=this%default_value) &
-              ])
+       case (MAPL_STATEITEM_VECTOR%ot)
+          std_name_1 = 'unknown'
+          std_name_2 = 'unknown'
+          if (allocated(this%standard_name)) then
+             call split_name(this%standard_name, std_name_1, std_name_2, _RC)
+          end if
+          if (this%vector_component_names%size() == 0) then
+             call vector_component_names%push_back('unknown')
+             call vector_component_names%push_back('unknown')
+          else
+             vector_component_names = this%vector_component_names
+          end if
+
+          if (allocated(this%vector_basis_kind)) then
+             basis_kind = this%vector_basis_kind
+          else
+             basis_kind = VECTOR_BASIS_KIND_NS
+          end if
+          aspect = VectorClassAspect(this%vector_component_names, &
+               [ &
+               FieldClassAspect(standard_name=std_name_1, fill_value=this%fill_value), &
+               FieldClassAspect(standard_name=std_name_2, fill_value=this%fill_value) &
+               ], &
+               basis_kind)
       case (MAPL_STATEITEM_BRACKET%ot)
-         aspect = BracketClassAspect(this%bracket_size, this%standard_name)
+         aspect = BracketClassAspect(this%bracket_size, this%standard_name, fill_value=this%fill_value)
+      case (MAPL_STATEITEM_VECTORBRACKET%ot)
+         if (allocated(this%vector_basis_kind)) then
+            aspect = VectorBracketClassAspect(this%bracket_size, this%standard_name, vector_basis_kind=this%vector_basis_kind, fill_value=this%fill_value)
+         else
+            aspect = VectorBracketClassAspect(this%bracket_size, this%standard_name, fill_value=this%fill_value)
+         end if
       case (MAPL_STATEITEM_WILDCARD%ot)
          allocate(aspect,source=WildcardClassAspect())
       case (MAPL_STATEITEM_SERVICE%ot)
@@ -593,6 +711,7 @@ contains
    end function make_ClassAspect
 
    subroutine verify_variable_spec(spec, rc)
+
       class(VariableSpec), intent(in) :: spec
       integer, optional, intent(out) :: rc
       integer :: status
@@ -607,7 +726,6 @@ contains
       call verify_short_name(spec%short_name, _RC)
       call verify_regrid(spec%regrid_param, spec%regrid_method, _RC)
       call verify_deferred_items_have_export_intent(spec%has_deferred_aspects, spec%state_intent, _RC)
-      
 
       _RETURN(_SUCCESS)
 
@@ -617,8 +735,6 @@ contains
          logical, intent(in) :: has_deferred_aspects
          type(esmf_StateIntent_Flag), intent(in) :: state_intent
          integer, optional, intent(out) :: rc
-
-         integer :: status
 
          _RETURN_UNLESS(has_deferred_aspects)
 

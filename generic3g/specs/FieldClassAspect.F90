@@ -24,11 +24,13 @@ module mapl3g_FieldClassAspect
    use mapl3g_ESMF_Utilities, only: get_substate
 
    use mapl3g_Field_API
+   use mapl3g_FieldBundle_API
    use mapl3g_FieldInfo, only: FieldInfoSetInternal
    use mapl3g_RestartModes, only: RestartMode
 
    use mapl_FieldUtilities
    use mapl_ErrorHandling
+   use mapl_KeywordEnforcer
    use esmf
    use pflogger
 
@@ -42,14 +44,14 @@ module mapl3g_FieldClassAspect
       procedure :: to_fieldclassaspect_from_poly
       procedure :: to_fieldclassaspect_from_map
    end interface to_FieldClassAspect
-   
+
    type, extends(ClassAspect) :: FieldClassAspect
       private
       logical :: is_created = .false.
       type(ESMF_Field) :: payload
       character(:), allocatable :: standard_name
       character(:), allocatable :: long_name
-      real(kind=ESMF_KIND_R4), allocatable :: default_value
+      real(kind=ESMF_KIND_R4), allocatable :: fill_value
       type(RestartMode), allocatable :: restart_mode
    contains
       procedure :: get_aspect_order
@@ -89,12 +91,12 @@ contains
    function new_FieldClassAspect( &
         standard_name, &
         long_name, &
-        default_value, &
+        fill_value, &
         restart_mode) result(aspect)
       type(FieldClassAspect) :: aspect
       character(*), optional, intent(in) :: standard_name
       character(*), optional, intent(in) :: long_name
-      real(kind=ESMF_KIND_R4), optional, intent(in) :: default_value
+      real(kind=ESMF_KIND_R4), optional, intent(in) :: fill_value
       type(RestartMode), optional, intent(in) :: restart_mode
 
       aspect%standard_name = 'unknown'
@@ -107,8 +109,8 @@ contains
          aspect%long_name = long_name
       end if
 
-      if (present(default_value)) then
-         aspect%default_value = default_value
+      if (present(fill_value)) then
+         aspect%fill_value = fill_value
       end if
 
       if (present(restart_mode)) then
@@ -122,37 +124,38 @@ contains
       type(AspectMap), intent(in) :: goal_aspects
       integer, optional, intent(out) :: rc
 
-      aspect_ids = [ &
-           CLASS_ASPECT_ID, &
-           ATTRIBUTES_ASPECT_ID, &
-           UNGRIDDED_DIMS_ASPECT_ID, &
-           GEOM_ASPECT_ID, &
-           VERTICAL_GRID_ASPECT_ID, &
-           UNITS_ASPECT_ID, &
-           TYPEKIND_ASPECT_ID &
-           ]
+       aspect_ids = [ &
+            CLASS_ASPECT_ID, &
+            ATTRIBUTES_ASPECT_ID, &
+            UNGRIDDED_DIMS_ASPECT_ID, &
+            QUANTITY_TYPE_ASPECT_ID, &
+            CONSERVATION_ASPECT_ID, &
+            GEOM_ASPECT_ID, &
+            VERTICAL_GRID_ASPECT_ID, &
+            NORMALIZATION_ASPECT_ID, &
+            UNITS_ASPECT_ID, &
+            TYPEKIND_ASPECT_ID &
+            ]
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
       _UNUSED_DUMMY(goal_aspects)
    end function get_aspect_order
 
 
-   subroutine create(this, handle, rc)
+   subroutine create(this, other_aspects, rc)
       class(FieldClassAspect), intent(inout) :: this
-      integer, optional, intent(in) :: handle(:)
+      type(AspectMap), intent(in) :: other_aspects
       integer, optional, intent(out) :: rc
 
       integer :: status
-      type(ESMF_Info) :: info
 
       this%payload = ESMF_FieldEmptyCreate(_RC)
-      _RETURN_UNLESS(present(handle))
-      
-      call ESMF_InfoGetFromHost(this%payload, info, _RC)
-      call FieldInfoSetInternal(info, spec_handle=handle, _RC)
-      call FieldInfoSetInternal(info, allocation_status=STATEITEM_ALLOCATION_CREATED, _RC)
+
+      call mapl_FieldSet(this%payload, allocation_status=STATEITEM_ALLOCATION_CREATED, _RC)
 
       _RETURN(ESMF_SUCCESS)
+      _UNUSED_DUMMY(other_aspects)
    end subroutine create
 
    subroutine activate(this, rc)
@@ -177,85 +180,23 @@ contains
       integer :: status
       type(ESMF_FieldStatus_Flag) :: fstatus
 
-      type(GeomAspect) :: geom_aspect
-      type(ESMF_Geom) :: geom
-      type(HorizontalDimsSpec) :: horizontal_dims_spec
-      integer :: dim_count
-      integer, allocatable :: grid_to_field_map(:)
-
-      type(VerticalGridAspect) :: vertical_aspect
-      class(VerticalGrid), allocatable :: vertical_grid
-      type(VerticalStaggerLoc) :: vertical_stagger
-      integer, allocatable :: num_vgrid_levels
-      integer, allocatable :: num_field_levels
-
-      type(UngriddedDimsAspect) :: ungridded_dims_aspect
-      type(UngriddedDims) :: ungridded_dims
-
-      type(UnitsAspect) :: units_aspect
-      character(:), allocatable :: units
-
-      type(TypekindAspect) :: typekind_aspect
-      type(ESMF_TypeKind_Flag) :: typekind
-
-      integer :: idim
-
       call ESMF_FieldGet(this%payload, status=fstatus, _RC)
       _RETURN_IF(fstatus == ESMF_FIELDSTATUS_COMPLETE)
 
-      geom_aspect = to_GeomAspect(other_aspects, _RC)
-      geom = geom_aspect%get_geom(_RC)
-      call ESMF_FieldEmptySet(this%payload, geom, _RC)
-
-      call ESMF_GeomGet(geom, dimCount=dim_count, _RC)
-      allocate(grid_to_field_map(dim_count), source=0)
-      horizontal_dims_spec = geom_aspect%get_horizontal_dims_spec(_RC)
-      _ASSERT(horizontal_dims_spec /= HORIZONTAL_DIMS_UNKNOWN, "should be one of GEOM/NONE")
-      if (horizontal_dims_spec == HORIZONTAL_DIMS_GEOM) then
-         grid_to_field_map = [(idim, idim=1,dim_count)]
-      end if
-
-      vertical_aspect = to_VerticalGridAspect(other_aspects, _RC)
-      vertical_stagger = vertical_aspect%get_vertical_stagger()
-      if (vertical_stagger /= VERTICAL_STAGGER_NONE) then
-         vertical_grid = vertical_aspect%get_vertical_grid(_RC)
-         num_vgrid_levels = vertical_grid%get_num_levels()
-         if (vertical_stagger == VERTICAL_STAGGER_EDGE) then
-            num_field_levels = num_vgrid_levels + 1
-         else if (vertical_stagger == VERTICAL_STAGGER_CENTER) then
-            num_field_levels = num_vgrid_levels
-         end if
-      end if
-
-      ungridded_dims_aspect = to_UngriddedDimsAspect(other_aspects, _RC)
-      ungridded_dims = ungridded_dims_aspect%get_ungridded_dims()
-
-      units_aspect = to_UnitsAspect(other_aspects, _RC)
-      units = units_aspect%get_units(_RC)
-
-      typekind_aspect = to_TypekindAspect(other_aspects, _RC)
-      typekind = typekind_aspect%get_typekind()
-
-      call MAPL_FieldEmptyComplete(this%payload, &
-           typekind=typekind, &
-           gridToFieldMap=grid_to_field_map, &
-           ungridded_dims=ungridded_dims, &
-           num_levels=num_field_levels, &
-           vert_staggerLoc=vertical_stagger, &
-           units=units, &
+      call mapl_FieldSet(this%payload, &
            standard_name=this%standard_name, &
            long_name=this%long_name, &
            _RC)
-      call ESMF_FieldGet(this%payload, status=fstatus, _RC)
-      _ASSERT(fstatus == ESMF_FIELDSTATUS_COMPLETE, 'ESMF field status problem.')
 
-      if (allocated(this%default_value)) then
-         call FieldSet(this%payload, this%default_value, _RC)
+      call mapl_FieldEmptyComplete(this%payload, _RC)
+
+      if (allocated(this%fill_value)) then
+         call FieldSet(this%payload, this%fill_value, _RC)
       end if
 
       _RETURN(ESMF_SUCCESS)
+      _UNUSED_DUMMY(other_aspects)
    end subroutine allocate
-
 
    subroutine destroy(this, rc)
       class(FieldClassAspect), intent(inout) :: this
@@ -277,11 +218,11 @@ contains
       type(FieldClassAspect) :: import_
       integer :: status
 
-      _RETURN_IF(allocated(this%default_value))
+      _RETURN_IF(allocated(this%fill_value))
 
       import_ = to_FieldClassAspect(import, _RC)
-      if (allocated(import_%default_value)) then ! import wins (for now)
-         this%default_value = import_%default_value
+      if (allocated(import_%fill_value)) then ! import wins (for now)
+         this%fill_value = import_%fill_value
       end if
 
       _RETURN(_SUCCESS)
@@ -301,7 +242,7 @@ contains
       call this%destroy(_RC) ! import is replaced by export/extension
       this%payload = export_%payload
 
-      call mirror(this%default_value, export_%default_value)
+      call mirror(this%fill_value, export_%fill_value)
 
       call ESMF_InfoGetFromHost(this%payload, info, _RC)
       call FieldInfoSetInternal(info, allocation_status=STATEITEM_ALLOCATION_CONNECTED, _RC)
@@ -333,7 +274,7 @@ contains
         end if
 
       end subroutine mirror
-      
+
    end subroutine connect_to_export
 
    function to_fieldclassaspect_from_poly(aspect, rc) result(field_aspect)
@@ -371,15 +312,21 @@ contains
       class(StateItemAspect), intent(in) :: dst
       type(AspectMap), target, intent(in) :: other_aspects
       integer, optional, intent(out) :: rc
-      
+
       transform = NullTransform()
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(src)
+      _UNUSED_DUMMY(dst)
+      _UNUSED_DUMMY(other_aspects)
    end function make_transform
 
    logical function supports_conversion_general(src)
       class(FieldClassAspect), intent(in) :: src
+
       supports_conversion_general = .false.
+
+      _UNUSED_DUMMY(src)
    end function supports_conversion_general
 
    logical function supports_conversion_specific(src, dst)
@@ -388,6 +335,7 @@ contains
 
       supports_conversion_specific = .false.
 
+      _UNUSED_DUMMY(src)
       _UNUSED_DUMMY(dst)
    end function supports_conversion_specific
 
@@ -404,7 +352,7 @@ contains
       logical :: is_alias
       character(:), allocatable :: full_name, inner_name, intent
       integer :: idx, alias_id, status
-      
+
       intent = actual_pt%get_state_intent()
       call multi_state%get_state(state, intent, _RC)
 
@@ -443,17 +391,26 @@ contains
 
       call ESMF_FieldBundleAdd(field_bundle, [this%payload], multiflag=.true., _RC)
 
-
       _RETURN(_SUCCESS)
    end subroutine add_to_bundle
 
-   function get_payload(this) result(field)
-      type(ESMF_Field) :: field
+   subroutine get_payload(this, unusable, field, bundle, state, rc)
       class(FieldClassAspect), intent(in) :: this
-      field = this%payload
-   end function get_payload
+      class(KeywordEnforcer), optional, intent(out) :: unusable
+      type(esmf_Field), optional, allocatable, intent(out) :: field
+      type(esmf_FieldBundle), optional, allocatable, intent(out) :: bundle
+      type(esmf_State), optional, allocatable, intent(out) :: state
+      integer, optional, intent(out) :: rc
 
-   
+      field = this%payload
+
+      _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(unusable)
+      _UNUSED_DUMMY(bundle)
+      _UNUSED_DUMMY(state)
+   end subroutine get_payload
+
+
    function get_aspect_id() result(aspect_id)
       type(AspectId) :: aspect_id
       aspect_id = CLASS_ASPECT_ID

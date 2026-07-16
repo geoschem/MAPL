@@ -14,27 +14,39 @@ set(srcs
 
   GeomManager.F90
 
-# gFTL containers
+  GeomGet.F90
+  GridGet.F90
+  GridGetGlobal.F90
+  GridGetHorzIJIndex.F90
+  GeomGetHorzIJIndex.F90
+
+  # gFTL containers
   GeomFactoryVector.F90
   GeomSpecVector.F90
   IntegerMaplGeomMap.F90
 
   VectorBasis.F90
-  )
+
+  Subgrid.F90
+)
 
 esma_add_library(${this}
   SRCS ${srcs}
-  DEPENDENCIES MAPL.pfio MAPL.base MAPL.shared MAPL.hconfig_utils GFTL::gftl-v2
+  DEPENDENCIES MAPL.pfio MAPL.shared MAPL.hconfig_utils MAPL.field MAPL.esmf_utils GFTL::gftl-v2
   TYPE SHARED
-  )
+)
 
-add_subdirectory(API)
+add_subdirectory(GridGet)
 add_subdirectory(MaplGeom)
 add_subdirectory(CoordinateAxis)
 add_subdirectory(LatLon)
 add_subdirectory(GeomManager)
 add_subdirectory(VectorBasis)
 add_subdirectory(CubedSphere)
+add_subdirectory(LocStream)
+add_subdirectory(Mesh)
+add_subdirectory(XY)
+add_subdirectory(EASE)
 
 target_include_directories (${this} PUBLIC
   $<BUILD_INTERFACE:${MAPL_SOURCE_DIR}/include>)

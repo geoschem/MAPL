@@ -1,11 +1,13 @@
 module mapl3g_VerticalGrid_API
    use mapl3g_VerticalGrid, only: VerticalGrid
+   use mapl3g_VerticalGrid, only: VERTICAL_GRID_NOT_FOUND
    use mapl3g_VerticalGridSpec, only: VerticalGridSpec
    use mapl3g_VerticalGridFactory, only: VerticalGridFactory
    use mapl3g_VerticalGridManager, only: VerticalGridManager
    use mapl3g_VerticalGridManager, only: get_vertical_grid_manager
    use mapl3g_IntegerPair, only: IntegerPair
    use mapl3g_VerticalStaggerLoc
+   use mapl3g_VerticalAlignment
    use mapl3g_BasicVerticalGrid, only: BasicVerticalGrid
    use mapl3g_BasicVerticalGrid, only: BasicVerticalGridSpec
    use mapl3g_BasicVerticalGrid, only: BasicVerticalGridFactory
@@ -16,7 +18,7 @@ module mapl3g_VerticalGrid_API
    public :: VerticalGrid
    public :: VerticalGridSpec
    public :: VerticalGridFactory
-   
+
    ! Manager
    public :: VerticalGridManager
    public :: get_vertical_grid_manager
@@ -33,9 +35,20 @@ module mapl3g_VerticalGrid_API
    public :: VERTICAL_STAGGER_MIRROR
    public :: VERTICAL_STAGGER_INVALID
    
+   ! Vertical alignment
+   public :: VerticalAlignment
+   public :: VALIGN_WITH_GRID
+   public :: VALIGN_UP
+   public :: VALIGN_DOWN
+   public :: VALIGN_INVALID
+   
    ! Basic grid types
    public :: BasicVerticalGrid
    public :: BasicVerticalGridSpec
    public :: BasicVerticalGridFactory
+
+   ! Parameters
+   public :: VERTICAL_GRID_NOT_FOUND
+  
    
 end module mapl3g_VerticalGrid_API

@@ -1,5 +1,5 @@
 module mapl3g_TransformId
-   implicit none(type, external)
+   implicit none(type,external)
    private
 
    ! Type
@@ -15,10 +15,10 @@ module mapl3g_TransformId
    public :: GEOM_TRANSFORM_ID
    public :: UNITS_TRANSFORM_ID
    public :: VERTICAL_GRID_TRANSFORM_ID
-   public :: FREQUENCY_TRANSFORM_ID
    public :: TYPEKIND_TRANSFORM_ID
    public :: EVAL_TRANSFORM_ID
    public :: EXTEND_TRANSFORM_ID
+   public :: NORMALIZATION_TRANSFORM_ID
    
    type :: TransformId
       private
@@ -33,10 +33,10 @@ module mapl3g_TransformId
    type(TransformId), parameter :: GEOM_TRANSFORM_ID = TransformId(2)
    type(TransformId), parameter :: UNITS_TRANSFORM_ID = TransformId(3)
    type(TransformId), parameter :: VERTICAL_GRID_TRANSFORM_ID = TransformId(4)
-   type(TransformId), parameter :: FREQUENCY_TRANSFORM_ID = TransformId(5)
    type(TransformId), parameter :: TYPEKIND_TRANSFORM_ID = TransformId(6)
    type(TransformId), parameter :: EVAL_TRANSFORM_ID = TransformId(7)
    type(TransformId), parameter :: EXTEND_TRANSFORM_ID = TransformId(8)
+   type(TransformId), parameter :: NORMALIZATION_TRANSFORM_ID = TransformId(9)
    
    interface operator(==)
       procedure equal
@@ -70,14 +70,14 @@ contains
          s = "UNITS"
       case (VERTICAL_GRID_TRANSFORM_ID%id)
          s = "VERTICAL_GRID"
-      case (FREQUENCY_TRANSFORM_ID%id)
-         s = "FREQUENCY"
       case (TYPEKIND_TRANSFORM_ID%id)
          s = "TYPEKIND"
       case (EVAL_TRANSFORM_ID%id)
          s = "EVAL"
       case (EXTEND_TRANSFORM_ID%id)
          s = "EXTEND"
+      case (NORMALIZATION_TRANSFORM_ID%id)
+         s = "NORMALIZATION"
       case default
          s = "UNKNOWN"
       end select

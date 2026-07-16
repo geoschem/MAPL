@@ -13,9 +13,9 @@ cap:
 
   clock:
     dt: PT1H
-    start: 2007-01-01T00:00:00
+    start: 2007-03-25T00:00:00
     stop: 2999-03-02T21:00:00
-    segment_duration: P365D
+    segment_duration: P10D
 
   extdata_name: EXTDATA
   history_name: HIST
@@ -24,12 +24,12 @@ cap:
   mapl:
     children:
       GCM:
-        dso: libMAPL.componentDriverGridComp.dylib
+        dso: libMAPL.componentDriverGridComp
         setServices: setservices_
         config_file: GCM1.yaml
       EXTDATA:
-        dso: libMAPL.extdata3g.dylib
+        dso: libMAPL.extdata3g
         config_file: extdata1.yaml
       HIST:
-        dso: libMAPL.history3g.dylib
+        dso: libMAPL.history3g
         config_file: history1.yaml

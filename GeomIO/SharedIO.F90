@@ -7,22 +7,22 @@ module mapl3g_SharedIO
    use mapl3g_Field_API
    use mapl3g_VerticalStaggerLoc
    use pfio, only: FileMetaData, Variable, UnlimitedEntity
-   use pfio, only: PFIO_UNLIMITED, PFIO_REAL32, PFIO_REAL64
+   use pfio, only: PFIO_UNLIMITED, PFIO_REAL32, PFIO_REAL64, PFIO_INT32, PFIO_INT64
    use gFTL2_StringVector
    use mapl3g_StringDictionary
    use gFTL2_StringSet
    use mapl3g_Geom_API
-   use MAPL_BaseMod
    use mapl3g_UngriddedDims
+   use, intrinsic :: iso_fortran_env, only: REAL64
    use mapl3g_UngriddedDim
    use mapl3g_CompressionSettings
    use esmf
 
    implicit none(type,external)
+   private
 
    public add_variables
    public add_variable
-   public get_mapl_geom
    public create_time_variable
    public bundle_to_metadata
    public esmf_to_pfio_type
@@ -67,6 +67,7 @@ contains
       call add_variables(metadata, bundle, _RC)
 
       _RETURN(_SUCCESS)
+
    end function bundle_to_metadata
 
    subroutine add_variables(metadata, bundle, rc)
@@ -75,9 +76,8 @@ contains
       integer, intent(out), optional :: rc
 
       integer :: status, i
-      type(ESMF_Field) :: field
       type(ESMF_Field), allocatable :: fieldList(:)
-
+ 
       call MAPL_FieldBundleGet(bundle, fieldList=fieldList, _RC)
       do i = 1, size(fieldList)
          call add_variable(metadata, fieldList(i), _RC)
@@ -113,7 +113,8 @@ contains
       variable_dim_names = get_variable_dim_names(field, _RC)
       call ESMF_FieldGet(field, geom=esmfgeom, _RC)
       mapl_geom => get_mapl_geom(esmfgeom, _RC)
-      call MAPL_FieldGet(field, short_name=short_name, typekind=typekind, _RC)
+      call MAPL_FieldGet(field, short_name=short_name, _RC)
+      call ESMF_FieldGet(field, typekind=typekind, _RC)
       pfio_type = esmf_to_pfio_type(typekind ,_RC)
       call ESMF_InfoGetFromHost(field, infoh, _RC)
       call compression_settings%update_from_info(infoh, _RC)
@@ -159,7 +160,6 @@ contains
       type(MAPLGeom), pointer :: mapl_geom
       type(StringVector) :: grid_variables
       type(ESMF_Geom) :: esmfgeom
-      type(ESMF_Info) :: field_info
       character(len=:), allocatable :: vert_dim_name, ungridded_names
       logical :: vert_only
       integer :: grid_to_field_map(2), status
@@ -185,21 +185,6 @@ contains
       _RETURN(_SUCCESS)
    end function get_variable_dim_names
 
-   function get_mapl_geom(geom, rc) result(mapl_geom)
-      type(MAPLGeom), pointer :: mapl_geom
-      type(ESMF_Geom), intent(in) :: geom
-      integer, optional, intent(out) :: rc
-
-      integer :: status, id
-      type(GeomManager), pointer :: geom_mgr
-
-      geom_mgr => get_geom_manager()
-      id = MAPL_GeomGetId(geom, _RC)
-      mapl_geom => geom_mgr%get_mapl_geom_from_id(id, _RC)
-      _RETURN(_SUCCESS)
-
-   end function get_mapl_geom
-
    function esmf_to_pfio_type(esmf_type, rc) result(pfio_type)
       integer :: pfio_type
       type(ESMF_TYPEKIND_FLAG), intent(in) :: esmf_type
@@ -209,6 +194,10 @@ contains
          pfio_type = PFIO_REAL32
       else if (esmf_type == ESMF_TYPEKIND_R8) then
          pfio_type = PFIO_REAL64
+      else if (esmf_type == ESMF_TYPEKIND_I4) then
+         pfio_type = PFIO_INT32
+      else if (esmf_type == ESMF_TYPEKIND_I8) then
+         pfio_type = PFIO_INT64
       else
          _FAIL("Unsupported ESMF field typekind for output")
       end if
@@ -258,9 +247,7 @@ contains
       character(len=:), allocatable :: dim_name
       type(VerticalStaggerLoc) :: vertical_stagger
       type(ESMF_Field), allocatable :: fieldList(:)
-      integer :: i, j, num_field_levels, status
-      type(Variable) :: level_var
-      real(kind=REAL64), allocatable :: temp_coords(:)
+      integer :: i, num_field_levels, status
       logical :: lev_added, edge_added
 
       call MAPL_FieldBundleGet(bundle, fieldList=fieldList, _RC)
@@ -330,7 +317,6 @@ contains
       type(UngriddedDims) :: field_ungridded_dims
       type(UngriddedDim) :: u
       integer :: ifield, jdim
-      type(ESMF_Field) :: field
       type(ESMF_Field), allocatable :: fieldList(:)
       type(StringSet) :: dim_names
       character(:), allocatable :: dim_name

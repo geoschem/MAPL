@@ -8,7 +8,7 @@ endif ()
 
 project (
   MAPL
-  VERSION 2.62.2
+  VERSION 3.0.0
   LANGUAGES Fortran CXX C)  # Note - CXX is required for ESMF
 
 # Set the possible values of build type for cmake-gui
@@ -61,6 +61,22 @@ endif ()
 # This tells cmake to assume MAPL's cmake directory is the first place to look
 list (PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
+# Newer ecbuild sets CMAKE_BUILD_WITH_INSTALL_RPATH=TRUE when ENABLE_RELATIVE_RPATHS
+# is ON (the default). This causes test binaries in the build tree to use the
+# install RPATH ($ORIGIN/../lib) at build time, which does not resolve correctly
+# against the build-tree library locations. Force FALSE so that CMake uses its
+# automatic build-tree RPATH (absolute paths) for targets in the build tree.
+set (CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+
+option (BUILD_SHARED_MAPL "Build shared MAPL libraries" ON)
+if (BUILD_SHARED_MAPL)
+  set (MAPL_LIBRARY_TYPE SHARED)
+else ()
+  set (MAPL_LIBRARY_TYPE STATIC)
+endif()
+message (STATUS "Building MAPL as ${MAPL_LIBRARY_TYPE} libraries")
+
+
 # Some users of MAPL build GFE libraries inline with their application
 # using an add_subdirectory() call rather than as a pre-build library.
 # This would then populate the target already leading to find_package()
@@ -100,13 +116,7 @@ if(BUILD_WITH_FARGPARSE)
   message (STATUS "Found fArgParse: ${FARGPARSE_DIR} (found version ${FARGPARSE_VERSION})")
 endif()
 
-option(USE_EXTDATA2G "Use ExtData2G" ON)
-if(USE_EXTDATA2G)
-  set (EXTDATA2G_TARGET "MAPL.ExtData2G" CACHE STRING "ExtData2G Target")
-  message (STATUS "Building with ExtData2G")
-else()
-  set (EXTDATA2G_TARGET "" CACHE STRING "ExtData2G Target")
-endif()
+message (STATUS "Building with ExtData2G")
 
 option(BUILD_WITH_PFLOGGER "Build MAPL with pFlogger library support" ON)
 if (BUILD_WITH_PFLOGGER)
@@ -203,10 +213,6 @@ add_definitions(-Dsys${CMAKE_SYSTEM_NAME})
 include(mapl_acg)
 include(mapl_create_stub_component)
 
-# Special case - MAPL_cfio is built twice with two different precisions.
-add_subdirectory (MAPL_cfio MAPL_cfio_r4)
-add_subdirectory (MAPL_cfio MAPL_cfio_r8)
-
 # This tests for various capabilities of the compiler
 # We mainly use it for MPICH issues
 include(CheckCompilerCapabilities)
@@ -223,20 +229,17 @@ endif()
 add_subdirectory (udunits2f)
 add_subdirectory (pfio)
 add_subdirectory (profiler)
-add_subdirectory (generic)
 add_subdirectory (generic3g)
 add_subdirectory (vm)
 add_subdirectory (field)
 add_subdirectory (field_bundle)
 add_subdirectory (state)
-add_subdirectory (oomph) # temporary - will rename to generic when done
 add_subdirectory (shared)
 add_subdirectory (include)
-add_subdirectory (base)
-add_subdirectory (MAPL)
+add_subdirectory (base3g)
 add_subdirectory (mapl3g)
+add_subdirectory (utilities)
 add_subdirectory (gridcomps)
-add_subdirectory (griddedio)
 add_subdirectory (GeomIO)
 add_subdirectory (esmf_utils)
 add_subdirectory (vertical)
@@ -246,12 +249,12 @@ if (BUILD_WITH_FARGPARSE)
    add_subdirectory (docs)
    add_subdirectory (benchmarks)
 endif()
-
 add_subdirectory (geom)
 add_subdirectory (vertical_grid)
 add_subdirectory (regridder_mgr)
 add_subdirectory (hconfig)
 add_subdirectory (hconfig_utils)
+add_subdirectory(Python)
 
 if (PFUNIT_FOUND)
   include (add_pfunit_ctest)
@@ -269,13 +272,6 @@ add_subdirectory (Apps)
 # @env will exist here if MAPL is built as itself but not as part of, say, GEOSgcm
 esma_add_subdirectory (ESMA_env FOUND ESMA_env_FOUND)
 
-# Install the Python directory
-install (
-   DIRECTORY Python
-   DESTINATION lib
-   USE_SOURCE_PERMISSIONS
-   )
-
 install (
    DIRECTORY cmake
    DESTINATION ${INSTALL_DATA_DIR}
@@ -284,6 +280,23 @@ install (
 
 configure_file(BUILD_INFO.rc.in BUILD_INFO.rc @ONLY)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BUILD_INFO.rc DESTINATION etc)
+
+# Install the canonical GEOS field dictionary so experiment scripts can
+# copy/link it as field_dictionary.yaml in the run directory.
+# mepo can clone subrepos in three styles (no prefix, @ prefix, @ suffix).
+set(FIELD_DICTIONARY_DIRS
+  GEOS_FieldDictionary
+  @GEOS_FieldDictionary
+  GEOS_FieldDictionary@
+)
+foreach(dir IN LISTS FIELD_DICTIONARY_DIRS)
+  if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/geos_field_dictionary.yaml)
+    install(
+      FILES ${CMAKE_CURRENT_SOURCE_DIR}/${dir}/geos_field_dictionary.yaml
+      DESTINATION etc
+    )
+  endif()
+endforeach()
 
 # https://www.scivision.dev/cmake-auto-gitignore-build-dir/
 # --- auto-ignore build directory

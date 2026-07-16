@@ -5,7 +5,7 @@ mapl:
       dso: libconfigurable_gridcomp
       config_file: scenarios/statistics_real/collection_1.yaml
     stat:
-      dso: libmapl_statisticsgridcomp
+      dso: libMAPL_StatisticsGridComp
       config_file: scenarios/statistics_real/stat.yaml
 
   states: {}
@@ -18,4 +18,8 @@ mapl:
     - src_name: A/TS
       src_comp: stat
       dst_name: TS_avg
+      dst_comp: collection_1
+    - src_name: A/PS
+      src_comp: stat
+      dst_name: PS_min
       dst_comp: collection_1

@@ -12,6 +12,7 @@ module mapl3g_StateClassAspect
    use mapl3g_MultiState
    use mapl3g_ESMF_Utilities, only: get_substate
    ! use mapl3g_State_API, only: MAPL_StateCreate, MAPL_StateInfoSetInternal
+   use mapl_KeywordEnforcer
    use mapl_ErrorHandling
    use esmf
 
@@ -85,12 +86,13 @@ contains
            ]
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
       _UNUSED_DUMMY(goal_aspects)
    end function get_aspect_order
 
-   subroutine create(this, handle, rc)
+   subroutine create(this, other_aspects, rc)
       class(StateClassAspect), intent(inout) :: this
-      integer, optional, intent(in) :: handle(:) ! unused
+      type(AspectMap), intent(in) :: other_aspects
       integer, optional, intent(out) :: rc
 
       integer :: status
@@ -98,7 +100,7 @@ contains
       this%payload = ESMF_StateCreate(stateIntent=this%state_intent, _RC)
 
       _RETURN(ESMF_SUCCESS)
-      _UNUSED_DUMMY(handle)
+      _UNUSED_DUMMY(other_aspects)
    end subroutine create
 
    subroutine activate(this, rc)
@@ -144,11 +146,11 @@ contains
    !    type(FieldClassAspect) :: import_
    !    integer :: status
 
-   !    _RETURN_IF(allocated(this%default_value))
+   !    _RETURN_IF(allocated(this%fill_value))
 
    !    import_ = to_FieldClassAspect(import, _RC)
-   !    if (allocated(import_%default_value)) then ! import wins (for now)
-   !       this%default_value = import_%default_value
+   !    if (allocated(import_%fill_value)) then ! import wins (for now)
+   !       this%fill_value = import_%fill_value
    !    end if
 
    !    _RETURN(_SUCCESS)
@@ -199,11 +201,17 @@ contains
       transform = NullTransform()
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(src)
+      _UNUSED_DUMMY(dst)
+      _UNUSED_DUMMY(other_aspects)
    end function make_transform
 
    logical function supports_conversion_general(src)
       class(StateClassAspect), intent(in) :: src
+
       supports_conversion_general = .false.
+
+      _UNUSED_DUMMY(src)
    end function supports_conversion_general
 
    logical function supports_conversion_specific(src, dst)
@@ -212,6 +220,7 @@ contains
 
       supports_conversion_specific = .false.
 
+      _UNUSED_DUMMY(src)
       _UNUSED_DUMMY(dst)
    end function supports_conversion_specific
 
@@ -250,11 +259,22 @@ contains
       _RETURN(_SUCCESS)
    end subroutine add_to_state
 
-   function get_payload(this) result(state)
-      type(ESMF_State) :: state
+   subroutine get_payload(this, unusable, field, bundle, state, rc)
       class(StateClassAspect), intent(in) :: this
+      class(KeywordEnforcer), optional, intent(out) :: unusable
+      type(esmf_Field), optional, allocatable, intent(out) :: field
+      type(esmf_FieldBundle), optional, allocatable, intent(out) :: bundle
+      type(esmf_State), optional, allocatable, intent(out) :: state
+      integer, optional, intent(out) :: rc
+
       state = this%payload
-   end function get_payload
+
+      _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
+      _UNUSED_DUMMY(unusable)
+      _UNUSED_DUMMY(field)
+      _UNUSED_DUMMY(bundle)
+   end subroutine get_payload
 
    function get_aspect_id() result(aspect_id)
       type(AspectId) :: aspect_id

@@ -1,8 +1,7 @@
-#include "MAPL_ErrLog.h"
+#include "MAPL.h"
 
 submodule (mapl3g_LatLonDecomposition) equal_to_smod
    use mapl_ErrorHandlingMod
-   use MAPL_Base
    implicit none (type, external)
 
 contains

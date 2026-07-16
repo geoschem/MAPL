@@ -4,7 +4,7 @@ module mapl3g_ExtensionTransform
    use mapl3g_AspectId
    use mapl_ErrorHandling
    use ESMF
-   implicit none
+   implicit none(type,external)
    private
 
    public :: ExtensionTransform
@@ -68,6 +68,7 @@ contains
    logical function runs_invalidate(this)
       class(ExtensionTransform), intent(in) :: this
       runs_invalidate = .FALSE.
+      _UNUSED_DUMMY(this)
    end function runs_invalidate
 
 end module mapl3g_ExtensionTransform

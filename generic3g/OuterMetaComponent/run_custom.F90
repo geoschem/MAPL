@@ -3,12 +3,12 @@
 submodule (mapl3g_OuterMetaComponent) run_custom_smod
    use mapl_ErrorHandling
    use esmf, only: operator(==)
-   implicit none
+   implicit none(type,external)
 
 contains
 
    module subroutine run_custom(this, method_flag, phase_name, rc)
-      class(OuterMetaComponent), intent(inout) :: this
+      class(OuterMetaComponent), target, intent(inout) :: this
       type(ESMF_METHOD_FLAG), intent(in) :: method_flag
       character(*), intent(in) :: phase_name
       integer, optional, intent(out) :: rc
@@ -27,6 +27,10 @@ contains
          call this%user_gc_driver%run(phase_idx=phase_idx, _RC)
       else if (method_flag == ESMF_METHOD_FINALIZE) then
          call this%user_gc_driver%finalize(phase_idx=phase_idx, _RC)
+      else if (method_flag == ESMF_METHOD_READRESTART) then
+         call this%user_gc_driver%read_restart(phase_idx=phase_idx, _RC)
+      else if (method_flag == ESMF_METHOD_WRITERESTART) then
+         call this%user_gc_driver%write_restart(phase_idx=phase_idx, _RC)
       else
          _FAIL('Unknown ESMF method flag.')
       end if

@@ -10,13 +10,15 @@ module Test_ModelVerticalGrid
 
    use mapl_ErrorHandling
    use mapl3g_VerticalStaggerLoc
+   use mapl3g_VerticalGrid_API
    use mapl3g_ModelVerticalGrid
    use mapl3g_StateRegistry
    use mapl3g_VariableSpec
    use mapl3g_VirtualConnectionPt
    use mapl3g_ActualConnectionPt
    use mapl3g_StateItemSpec
-   use mapl3g_StateItemExtension
+   use mapl3g_StateItemAspect
+   use mapl3g_AspectId
    use mapl3g_ComponentDriver
    use mapl3g_ComponentDriver
    use mapl3g_ComponentDriverVector
@@ -24,6 +26,18 @@ module Test_ModelVerticalGrid
    use mapl3g_MultiState
    use mapl3g_Geom_API
    use mapl3g_CouplerPhases, only: GENERIC_COUPLER_UPDATE
+   use mapl3g_GeomAspect
+   use mapl3g_TypekindAspect
+   use mapl3g_UnitsAspect
+   use mapl3g_UngriddedDimsAspect
+   use mapl3g_UngriddedDims
+   use mapl3g_AttributesAspect
+   use mapl3g_FieldClassAspect
+   use mapl3g_QuantityTypeAspect
+   use mapl3g_ConservationAspect
+   use mapl3g_NormalizationAspect
+   use mapl3g_NormalizationType
+   use gFTL2_StringVector
    use esmf
    ! testing framework
    use ESMF_TestMethod_mod
@@ -41,7 +55,7 @@ contains
    subroutine setup_(var_name, geom, vgrid, registry, rc)
       character(*), intent(in) :: var_name
       type(ESMF_Geom), intent(in) :: geom
-      type(ModelVerticalGrid), intent(in) :: vgrid
+      class(VerticalGrid), intent(in) :: vgrid
       type(StateRegistry), intent(inout) :: registry
       integer, optional, intent(out) :: rc
 
@@ -49,7 +63,7 @@ contains
       type(VariableSpec) :: var_spec
       type(StateItemSpec) :: fld_spec
       type(VirtualConnectionPt) :: v_pt
-      type(StateItemExtension), pointer :: extension
+      class(StateItemSpec), pointer :: extension
       type(StateItemSpec), pointer :: spec
       integer :: status
 
@@ -65,36 +79,51 @@ contains
       var_spec = make_VariableSpec(&
            short_name=var_name, &
            state_intent=ESMF_STATEINTENT_EXPORT, &
-           standard_name="air_pressure", &
+           standard_name="air_pressure " // var_name, &
            units="hPa", &
            vertical_stagger=vertical_stagger, &
-           default_value=3., _RC)
+           fill_value=3., _RC)
       fld_spec = var_spec%make_StateItemSpec(r, component_geom=geom, vertical_grid=vgrid, rc=status); _VERIFY(status)
       call fld_spec%create(_RC)
 
       v_pt = VirtualConnectionPt(state_intent="export", short_name=var_name)
       call registry%add_primary_spec(v_pt, fld_spec)
-      extension => registry%get_primary_extension(v_pt, _RC)
-      spec => extension%get_spec()
+      extension => registry%get_primary_spec(v_pt, _RC)
+      spec => extension
       call spec%activate(_RC)
-      call spec%create(_RC)
 
       _RETURN(_SUCCESS)
    end subroutine setup_
 
-   subroutine setup(geom, vgrid, rc)
-      type(ESMF_Geom), intent(out) :: geom
-      type(ModelVerticalGrid), intent(out) :: vgrid
-      integer, intent(out) :: rc
+    subroutine setup(geom, vgrid, rc)
+       type(ESMF_Geom), intent(out) :: geom
+       class(VerticalGrid), allocatable, intent(out) :: vgrid
+       integer, intent(out) :: rc
 
-      integer :: status
+       integer :: status
+       type(VerticalGridManager), pointer :: vgrid_mgr
+       type(ModelVerticalGridSpec) :: vspec
+       type(StringVector) :: names, dims
 
-      ! geom, registry etc.
+       ! geom, registry etc.
       geom = make_geom(_RC)
       r = StateRegistry("dyn")
 
-      vgrid = ModelVerticalGrid(physical_dimension="pressure", short_name='PLE', num_levels=LM)
-      call vgrid%set_registry(r) ! MAPL_SetVerticalGrid(...)
+      vgrid_mgr => get_vertical_grid_manager()
+      names = StringVector()
+      call names%push_back("PLE")
+      call names%push_back("PL")
+      dims = StringVector()
+      call dims%push_back("pressure")
+      call dims%push_back("pressure")
+      vspec = ModelVerticalGridSpec(names, dims, num_levels=LM)
+      vgrid = vgrid_mgr%create_grid(vspec, _RC)
+
+!#      vgrid = ModelVerticalGrid(physical_dimension="pressure", short_name='PLE', num_levels=LM)
+      select type (vgrid)
+      type is (ModelVerticalGrid)
+         call vgrid%set_registry(r) ! MAPL_SetVerticalGrid(...)
+      end select
 
       call setup_("PLE", geom, vgrid, r, _RC)
       call setup_("PL", geom, vgrid, r, _RC)
@@ -124,19 +153,19 @@ contains
 
       num_levels = 10
       vgrid = ModelVerticalGrid(physical_dimension="height", short_name = 'PLE', num_levels=num_levels)
-      @assert_that(vgrid%get_num_levels(), is(num_levels))
+      @assert_that(vgrid%get_num_layers(), is(num_levels))
    end subroutine test_num_levels
 
    @test(type=ESMF_TestMethod, npes=[1])
    subroutine test_created_fields_have_num_levels(this)
       class(ESMF_TestMethod), intent(inout) :: this
-      type(ModelVerticalGrid) :: vgrid
+      class(VerticalGrid), allocatable :: vgrid
       integer :: rank
       integer, allocatable :: localElementCount(:)
       type(VirtualConnectionPt) :: ple_pt
       type(StateItemSpec), pointer :: spec
       type(MultiState) :: multi_state
-      type(StateItemExtension), pointer :: extension
+      class(StateItemSpec), pointer :: extension
       type(ESMF_Field) :: ple
       type(ESMF_Geom) :: geom
       integer :: rc, status
@@ -144,8 +173,8 @@ contains
      call setup(geom, vgrid, _RC)
      call r%allocate(_RC)
       ple_pt = VirtualConnectionPt(state_intent="export", short_name="PLE")
-      extension => r%get_primary_extension(ple_pt, _RC)
-      spec => extension%get_spec()
+      extension => r%get_primary_spec(ple_pt, _RC)
+      spec => extension
 
       multi_state = MultiState()
       call spec%add_to_state(multi_state, ActualConnectionPt(ple_pt), _RC)
@@ -164,25 +193,35 @@ contains
    ! should force extensions.
    subroutine test_get_coordinate_field_simple(this)
       class(ESMF_TestMethod), intent(inout) :: this
-      type(ModelVerticalGrid) :: vgrid
+      class(VerticalGrid), allocatable :: vgrid
       class(ComponentDriver), pointer :: coupler
       type(ESMF_Field) :: vcoord
       type(ESMF_Geom) :: geom
       integer :: rc, status
       real(ESMF_KIND_R4), pointer :: a(:,:,:)
+      type(AspectMap) :: aspects
 
       call setup(geom, vgrid, _RC)
 
+      ! Build aspect map with required aspects
+      call aspects%insert(CLASS_ASPECT_ID, FieldClassAspect(standard_name='', long_name=''))
+      call aspects%insert(ATTRIBUTES_ASPECT_ID, AttributesAspect())
+      call aspects%insert(UNGRIDDED_DIMS_ASPECT_ID, UngriddedDimsAspect(UngriddedDims()))
+      call aspects%insert(QUANTITY_TYPE_ASPECT_ID, QuantityTypeAspect())
+      call aspects%insert(CONSERVATION_ASPECT_ID, ConservationAspect())
+      call aspects%insert(NORMALIZATION_ASPECT_ID, NormalizationAspect(normalization_type=NORMALIZE_NONE, scale_factor=1.0))
+      call aspects%insert(GEOM_ASPECT_ID, GeomAspect(geom))
+      call aspects%insert(TYPEKIND_ASPECT_ID, TypekindAspect(ESMF_TYPEKIND_R4))
+      call aspects%insert(UNITS_ASPECT_ID, UnitsAspect("hPa"))
+
       vcoord = vgrid%get_coordinate_field( &
-           geom=geom, &
            physical_dimension="pressure", &
-           typekind=ESMF_TYPEKIND_R4, &
-           units="hPa", &
+           aspects=aspects, &
            coupler=coupler, &
            _RC)
       @assert_that(associated(coupler), is(false()))
       call r%allocate()
-      
+
       call ESMF_FieldGet(vcoord, fArrayPtr=a, _RC)
       @assert_that(a, every_item(is(equal_to(3.))))
 
@@ -195,7 +234,7 @@ contains
    ! scaled by 100 (hPa = 100 Pa)
    subroutine test_get_coordinate_field_change_units_edge(this)
       class(ESMF_TestMethod), intent(inout) :: this
-      type(ModelVerticalGrid) :: vgrid
+      class(VerticalGrid), allocatable :: vgrid
       type(ESMF_Field) :: vcoord
       type(ESMF_Geom) :: geom
       integer :: status
@@ -204,14 +243,24 @@ contains
       type(ComponentDriverPtr) :: driver
       class(ComponentDriver), pointer :: coupler
       integer :: i, rc
+      type(AspectMap) :: aspects
 
       call setup(geom, vgrid, _RC)
 
+      ! Build aspect map with required aspects
+      call aspects%insert(CLASS_ASPECT_ID, FieldClassAspect(standard_name='', long_name=''))
+      call aspects%insert(ATTRIBUTES_ASPECT_ID, AttributesAspect())
+      call aspects%insert(UNGRIDDED_DIMS_ASPECT_ID, UngriddedDimsAspect(UngriddedDims()))
+      call aspects%insert(QUANTITY_TYPE_ASPECT_ID, QuantityTypeAspect())
+      call aspects%insert(CONSERVATION_ASPECT_ID, ConservationAspect())
+      call aspects%insert(NORMALIZATION_ASPECT_ID, NormalizationAspect(normalization_type=NORMALIZE_NONE, scale_factor=1.0))
+      call aspects%insert(GEOM_ASPECT_ID, GeomAspect(geom))
+      call aspects%insert(TYPEKIND_ASPECT_ID, TypekindAspect(ESMF_TYPEKIND_R4))
+      call aspects%insert(UNITS_ASPECT_ID, UnitsAspect("Pa"))
+
        vcoord = vgrid%get_coordinate_field( &
-           geom=geom, &
            physical_dimension="pressure", &
-           typekind=ESMF_TYPEKIND_R4, &
-           units="Pa", &
+           aspects=aspects, &
            coupler=coupler, &
            _RC)
       @assert_that(associated(coupler), is(true()))

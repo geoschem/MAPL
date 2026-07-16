@@ -1,4 +1,4 @@
-#include "MAPL_ErrLog.h"
+#include "MAPL.h"
 
 ! This module provides a family of classes that encapsulate variant
 ! methods of specifying/running SetServices on a user gridcomp.
@@ -18,7 +18,7 @@ module mapl3g_UserSetServices
    use :: ESMF, only: ESMF_SUCCESS
    use :: mapl3g_ESMF_Interfaces, only: I_SetServices
    use :: mapl_ErrorHandling
-   implicit none
+   implicit none(type,external)
    private
 
    public :: user_setservices        ! overloaded factory method

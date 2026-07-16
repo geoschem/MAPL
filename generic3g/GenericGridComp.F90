@@ -1,4 +1,4 @@
-#include "MAPL_ErrLog.h"
+#include "MAPL.h"
 
 ! Each generic initialize phase can be supplemented by the user
 ! gridcomp if necessary.   User phases are MAPL phases appended by
@@ -18,7 +18,7 @@ module mapl3g_GenericGridComp
    use esmf
    use :: mapl_KeywordEnforcer, only: KeywordEnforcer
    use :: mapl_ErrorHandling
-   implicit none
+   implicit none(type,external)
    private
 
    ! Procedures
@@ -208,6 +208,8 @@ contains
       end select
 
       _RETURN(ESMF_SUCCESS)
+      _UNUSED_DUMMY(importState)
+      _UNUSED_DUMMY(exportState)
    end subroutine run
 
 
@@ -224,6 +226,8 @@ contains
       outer_meta => get_outer_meta(gridcomp, _RC)
       call outer_meta%finalize(importState, exportState, clock, _RC)
 
+      _UNUSED_DUMMY(importState)
+      _UNUSED_DUMMY(exportState)
       _RETURN(ESMF_SUCCESS)
    end subroutine finalize
 

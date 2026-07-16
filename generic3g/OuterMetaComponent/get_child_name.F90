@@ -5,7 +5,7 @@ submodule (mapl3g_OuterMetaComponent) get_child_name_smod
    use mapl3g_GriddedComponentDriverMap
    use mapl_ErrorHandling
 
-   implicit none
+   implicit none(type,external)
 
 contains
 
@@ -16,7 +16,6 @@ contains
       character(len=:), allocatable :: name
 
       type(GriddedComponentDriverMapIterator) :: iter
-      integer :: i
 
       _ASSERT(index > 0, "index should be >= 1")
       _ASSERT(index <= this%get_num_children(), "index should be <= num_children")

@@ -1,4 +1,4 @@
-#include "MAPL_ErrLog.h"
+#include "MAPL.h"
 
 submodule (mapl3g_ComponentSpecParser) parse_geometry_spec_smod
 
@@ -7,16 +7,17 @@ submodule (mapl3g_ComponentSpecParser) parse_geometry_spec_smod
    use mapl3g_VerticalGrid_API
    use mapl3g_ModelVerticalGrid
 
-   implicit none(external,type)
+   implicit none(type,external)
 
 contains
 
    ! Geom subcfg is passed raw to the GeomManager layer.  So little
    ! processing is needed here.
-   module function parse_geometry_spec(mapl_cfg, registry, rc) result(geometry_spec)
+   module function parse_geometry_spec(mapl_cfg, registry, component_name, rc) result(geometry_spec)
       type(GeometrySpec) :: geometry_spec
       type(ESMF_HConfig), intent(in) :: mapl_cfg
       type(StateRegistry), target, intent(in) :: registry
+      character(*), intent(in) :: component_name
       integer, optional, intent(out) :: rc
 
       integer :: status
@@ -89,6 +90,7 @@ contains
          geom_mgr => get_geom_manager()
          allocate(geom_spec, source=geom_mgr%make_geom_spec(esmf_geom_cfg, rc=status))
          _VERIFY(status)
+         call geom_spec%set_name(component_name)
          call ESMF_HConfigDestroy(geometry_cfg, _RC)
       end if
 
@@ -113,8 +115,10 @@ contains
       vgrid_manager => get_vertical_grid_manager(_RC)
       vgrid => vgrid_manager%create_grid(vertical_grid_cfg, _RC)
 
-      ! ModelVerticalGrid needs a registry which cannot be derived from a config.
-      ! This should only be used in testing.
+      ! ModelVerticalGrid needs a registry which cannot be derived
+      ! from a config.  Could possibly make registry an argument on
+      ! create_grid() above, and just ignore it for other vertical
+      ! grid subclasses?
       select type(vgrid)
       type is(ModelVerticalGrid)
          call vgrid%set_registry(registry)

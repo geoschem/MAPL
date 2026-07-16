@@ -14,9 +14,13 @@ case14
 case15
 case16
 case17
+case18
 case19
+case21
 case22
 case23
 case24
 case30
 case39
+case41
+case42

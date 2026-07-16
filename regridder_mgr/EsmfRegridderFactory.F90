@@ -4,6 +4,7 @@ module mapl3g_EsmfRegridderFactory
    use mapl3g_RegridderFactory
    use mapl3g_Regridder
    use mapl3g_RoutehandleParam
+   use mapl3g_RoutehandleSpec
    use mapl3g_RoutehandleManager
    use mapl3g_EsmfRegridder
    use mapl3g_RegridderParam
@@ -43,6 +44,7 @@ contains
       type(EsmfRegridderParam) :: reference
 
       supports = same_type_as(param, reference)
+      _UNUSED_DUMMY(this)
       
    end function supports
 
@@ -59,11 +61,17 @@ contains
       regriddr = NULL_REGRIDDER
       associate (p => spec%get_param())
         select type (p)
-        type is (EsmfRegridderParam)
-           rh_spec = RoutehandleSpec(spec%get_geom_in(), spec%get_geom_out(), p%get_routehandle_param())
+         type is (EsmfRegridderParam)
+            rh_spec = RoutehandleSpec(p%get_routehandle_param(), &
+                 spec%get_geom_in(), spec%get_geom_out(), &
+                 typekind_in=spec%get_typekind_in(), &
+                 typekind_out=spec%get_typekind_out())
            routehandle = this%rh_manager%get_routehandle(rh_spec, _RC)
            deallocate(regriddr) ! workaround for gfortran 12.3
-           regriddr = EsmfRegridder(p, routehandle)
+            regriddr = EsmfRegridder(p, routehandle, &
+                 typekind_in=spec%get_typekind_in(), &
+                 typekind_out=spec%get_typekind_out())
+           call regriddr%set_spec(spec)
         class default
            _FAIL('Wrong RegridderParam subclass passed to EsmfRegridderFactory.')
         end select

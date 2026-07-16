@@ -8,8 +8,9 @@ module mapl3g_FixedLevelsVerticalGrid
    use mapl3g_ComponentDriver
    use mapl3g_FieldCondensedArray, only: assign_fptr_condensed_array
    use pfio
-   use esmf, only: esmf_HConfig, esmf_Field, esmf_Geom, esmf_TypeKind_Flag
-   use esmf
+   use esmf, only: esmf_HConfig, esmf_HConfigIsDefined, esmf_HConfigAsString, esmf_HConfigAsR4Seq
+   use esmf, only: esmf_Field, esmf_Geom, esmf_TypeKind_Flag
+   use esmf, only: ESMF_KIND_R4, ESMF_TYPEKIND_R4
    use mapl3g_VerticalStaggerLoc
    use gftl2_StringVector, only: StringVector
    use mapl_ErrorHandling
@@ -29,19 +30,19 @@ module mapl3g_FixedLevelsVerticalGrid
    end type FixedLevelsVerticalGridSpec
    
    ! Grid type
-   type, extends(VerticalGrid) :: FixedLevelsVerticalGrid
-      private
-      type(FixedLevelsVerticalGridSpec) :: spec
-   contains
-      procedure :: initialize
-      procedure :: get_levels
-      procedure :: get_physical_dimension
-      procedure :: get_units
-      procedure :: get_num_levels
-      procedure :: get_coordinate_field
-      procedure :: get_supported_physical_dimensions
-      procedure :: matches
-   end type FixedLevelsVerticalGrid
+    type, extends(VerticalGrid) :: FixedLevelsVerticalGrid
+       private
+       type(FixedLevelsVerticalGridSpec) :: spec
+    contains
+       procedure :: initialize
+       procedure :: get_levels
+       procedure :: get_physical_dimension
+       procedure :: get_units
+       procedure :: get_num_layers
+       procedure :: get_coordinate_field
+       procedure :: get_supported_physical_dimensions
+       procedure :: matches
+    end type FixedLevelsVerticalGrid
    
    ! Factory type
    type, extends(VerticalGridFactory) :: FixedLevelsVerticalGridFactory
@@ -78,6 +79,7 @@ contains
       type(FixedLevelsVerticalGridSpec), intent(in) :: spec
 
       this%spec = spec
+      ! Default coordinate direction is already set to VCOORD_DIRECTION_DOWN in VerticalGrid
    end subroutine initialize
 
    function get_levels(this) result(levels)
@@ -100,42 +102,56 @@ contains
       character(len=*), intent(in) :: physical_dimension
       integer, optional, intent(out) :: rc
 
-      integer :: status
       _ASSERT(physical_dimension == this%get_physical_dimension(), 'Unsupported physical dimension: '//physical_dimension)
       units = this%spec%units
 
       _RETURN(_SUCCESS)
    end function get_units
 
-   function get_num_levels(this) result(num_levels)
-      integer :: num_levels
+   function get_num_layers(this) result(num_layers)
+      integer :: num_layers
       class(FixedLevelsVerticalGrid), intent(in) :: this
 
-      num_levels = size(this%spec%levels)
-   end function get_num_levels
+      num_layers = size(this%spec%levels)
+   end function get_num_layers
 
-   function get_coordinate_field(this, geom, physical_dimension, units, typekind, coupler, rc) result(field)
+   function get_coordinate_field(this, physical_dimension, aspects, coupler, rc) result(field)
+      use mapl3g_StateItemAspect, only: AspectMap
+      use mapl3g_GeomAspect, only: GeomAspect, to_GeomAspect
       type(esmf_Field) :: field
       class(FixedLevelsVerticalGrid), intent(in) :: this
-      type(esmf_Geom), intent(in) :: geom
       character(len=*), intent(in) :: physical_dimension
-      character(len=*), intent(in) :: units
-      type(esmf_TypeKind_Flag), intent(in) :: typekind
+      class(*), intent(in) :: aspects
       class(ComponentDriver), pointer, intent(out) :: coupler
       integer, intent(out), optional :: rc
       
       integer :: status
       real(kind=ESMF_KIND_R4), pointer :: farray3d(:, :, :)
       integer :: shape_(3), horz, ungrd
+      type(GeomAspect) :: geom_aspect
+      type(esmf_Geom) :: geom
+      type(AspectMap) :: aspects_
 
       coupler => null()
+      
+      ! Convert class(*) to AspectMap
+      select type (aspects)
+      type is (AspectMap)
+         aspects_ = aspects
+      class default
+         _FAIL('aspects must be of type AspectMap')
+      end select
+      
+      ! Extract geom from aspects
+      geom_aspect = to_GeomAspect(aspects_, _RC)
+      geom = geom_aspect%get_geom()
+      
       field = MAPL_FieldCreate( &
            geom=geom, &
            typekind=ESMF_TYPEKIND_R4, &
-           num_levels=size(this%spec%levels), &
+           vgrid=this, &
            vert_staggerloc=VERTICAL_STAGGER_CENTER, &
            _RC)
-
 
       ! Copy the 1D array, levels(:), to each point of the horz grid
       call assign_fptr_condensed_array(field, farray3d, _RC)
@@ -143,9 +159,9 @@ contains
       do concurrent (horz=1:shape_(1), ungrd=1:shape_(3))
          farray3d(horz, :, ungrd) = this%spec%levels(:)
       end do
-
       
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(physical_dimension)
    end function get_coordinate_field
 
    function get_supported_physical_dimensions(this) result(dimensions)
@@ -159,9 +175,7 @@ contains
       class(FixedLevelsVerticalGrid), intent(in) :: this
       class(VerticalGrid), intent(in) :: other
 
-      type(StringVector) :: supported_dims
-
-      matches = this%get_num_levels() == other%get_num_levels()
+      matches = this%get_num_layers() == other%get_num_layers()
       if (.not. matches) return
 
       select type (other)
@@ -180,6 +194,7 @@ contains
       class(FixedLevelsVerticalGridFactory), intent(in) :: this
       
       name = "FixedLevelsVerticalGrid"
+      _UNUSED_DUMMY(this)
    end function get_name
 
    function supports_spec(this, spec, rc) result(is_supported)
@@ -188,12 +203,12 @@ contains
       class(VerticalGridSpec), intent(in) :: spec
       integer, optional, intent(out) :: rc
 
-      integer :: status
       type(FixedLevelsVerticalGridSpec) :: fixed_spec
 
       is_supported = same_type_as(spec, fixed_spec)
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function supports_spec
 
    function supports_file_metadata(this, file_metadata, rc) result(is_supported)
@@ -204,7 +219,9 @@ contains
       
       ! Implementation would check if file_metadata contains required information
       is_supported = .false.  ! Placeholder
+
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function supports_file_metadata
 
    function supports_config(this, config, rc) result(is_supported)
@@ -232,6 +249,7 @@ contains
       is_supported = has_levels .and. has_physical_dimension
            
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function supports_config
 
    function create_spec_from_config(this, config, rc) result(spec)
@@ -273,8 +291,13 @@ contains
       type(FileMetadata), intent(in), target :: file_metadata
       integer, intent(out), optional :: rc
       
-      ! Placeholder implementation
-      integer :: status
+      ! Placeholder implementation - not yet implemented
+      ! Return empty spec to satisfy Fortran requirement for defined result
+      
+      spec = FixedLevelsVerticalGridSpec()
+      
+      _UNUSED_DUMMY(this)
+      _UNUSED_DUMMY(file_metadata)
       _RETURN(_FAILURE)
    end function create_spec_from_file_metadata
 
@@ -285,7 +308,6 @@ contains
       integer, intent(out), optional :: rc
       
       type(FixedLevelsVerticalGrid) :: local_grid
-      integer :: status
       
       select type (spec)
       type is (FixedLevelsVerticalGridSpec)
@@ -296,6 +318,7 @@ contains
       end select
       
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function create_grid_from_spec
 
    ! Helper function to get default units for a physical dimension

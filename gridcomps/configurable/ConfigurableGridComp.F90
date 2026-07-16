@@ -5,7 +5,7 @@ module mapl3g_ConfigurableGridComp
    use mapl_ErrorHandling
    use mapl3g_Generic, only: MAPL_GridCompSetEntryPoint, MAPL_GridCompRunChildren
    use mapl3g_Generic, only: MAPL_GridCompGet
-   use mapl, only: MAPL_GetPointer
+   use mapl3g_State_API, only: MAPL_StateGetPointer
    use MAPL_FieldPointerUtilities
    use esmf
 
@@ -68,7 +68,7 @@ contains
          has_default_vert_profile = ESMF_HConfigIsDefined(field_cfg, keyString=KEY_DEFAULT_VERT_PROFILE, _RC)
          if (has_default_vert_profile) then
             default_vert_profile = ESMF_HConfigAsR4Seq(field_cfg, keyString=KEY_DEFAULT_VERT_PROFILE, _RC)
-            call MAPL_GetPointer(exportState, ptr3d, trim(field_name), _RC)
+            call MAPL_StateGetPointer(exportState, ptr3d, trim(field_name), _RC)
             shape_ = shape(ptr3d)
             _ASSERT(shape_(3) == size(default_vert_profile), "incorrect size of vertical profile")
             do concurrent(ii = 1:shape_(1), jj=1:shape_(2))
@@ -92,7 +92,7 @@ contains
       integer :: status
       type(esmf_HConfig) :: hconfig
       logical :: has_run_section
-      type(esmf_HConfig) :: run_cfg, field_cfg
+      type(esmf_HConfig) :: run_cfg
       type(ESMF_HConfigIter) :: iter, e, b
       integer(kind=ESMF_KIND_I8) :: advanceCount
       integer, allocatable :: value
@@ -101,7 +101,6 @@ contains
       type(esmf_Field) :: field
       character(:), allocatable :: field_name
       type(esmf_TypeKind_Flag) :: typekind
-    
 
       call mapl_GridCompGet(gridcomp, hconfig=hconfig, _RC)
 
@@ -128,7 +127,7 @@ contains
          end do
          call esmf_HConfigDestroy(run_cfg, _RC)
       endif
-          
+
       call MAPL_GridcompRunChildren(gridcomp, phase_name="run", _RC)
 
       _RETURN(_SUCCESS)

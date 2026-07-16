@@ -4,7 +4,7 @@ submodule (mapl3g_OuterMetaComponent) run_clock_advance_smod
    use mapl3g_GenericPhases
    use mapl3g_GriddedComponentDriverMap
    use mapl_ErrorHandling
-   implicit none
+   implicit none(type,external)
 
 contains
 
@@ -25,6 +25,9 @@ contains
       type(ESMF_Time) :: currTime
 
       call ESMF_ClockGet(clock, currTime=currTime, _RC)
+      if (this%run_if_alarm_rings_next) then
+         call ESMF_ClockGetNextTime(clock, nextTime=currTime, _RC)
+      end if
       is_ringing = this%user_run_alarm%is_ringing(currTime, _RC)
       _RETURN_IF(.not. is_ringing)
 

@@ -1,7 +1,6 @@
-#include "MAPL_ErrLog.h"
+#include "MAPL.h"
 
 submodule (mapl3g_VectorBasis) new_NS_Basis_smod
-   use mapl_base, only: MAPL_GridGetCorners
 contains
 
 

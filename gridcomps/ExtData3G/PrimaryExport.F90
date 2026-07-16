@@ -1,7 +1,7 @@
-#include "MAPL_ErrLog.h"
+#include "MAPL.h"
 module mapl3g_PrimaryExport
    use ESMF
-   use MAPL_ExceptionHandling 
+   use MAPL_ExceptionHandling
    use mapl3g_AbstractDataSetFileSelector
    use mapl3g_NonClimDataSetFileSelector
    use mapl3g_ClimDataSetFileSelector
@@ -14,6 +14,7 @@ module mapl3g_PrimaryExport
    use mapl3g_ExtDataReader
    use gftl2_StringStringMap
    use gftl2_IntegerVector
+   use gftl2_StringVector
    use mapl3g_ExtDataRule
    use mapl3g_ExtDataCollection
    use mapl3g_ExtDataSample
@@ -24,12 +25,13 @@ module mapl3g_PrimaryExport
    use mapl3g_EsmfRegridder, only: EsmfRegridderParam
    use mapl3g_RegridderMethods
    implicit none
+   private
 
    public PrimaryExport
 
    type :: PrimaryExport
       character(len=:),  allocatable :: export_var
-      character(len=:),  allocatable :: file_var
+      type(StringVector) :: file_vars
       integer :: client_collection_id
       class(AbstractDataSetFileSelector), allocatable :: file_selector
       type(DataSetBracket) :: bracket
@@ -44,7 +46,7 @@ module mapl3g_PrimaryExport
          procedure :: get_file_selector
          procedure :: complete_export_spec
          procedure :: update_export_spec
-         procedure :: get_file_var_name
+         !procedure :: get_file_var_name
          procedure :: get_export_var_name
          procedure :: get_bracket
          procedure :: update_my_bracket
@@ -58,7 +60,7 @@ module mapl3g_PrimaryExport
 
    contains
 
-   function new_PrimaryExport(export_var, rule, collection, sample, time_range, time_step,  rc) result(primary_export) 
+   function new_PrimaryExport(export_var, rule, collection, sample, time_range, time_step,  rc) result(primary_export)
       type(PrimaryExport) :: primary_export
       character(len=*), intent(in) :: export_var
       type(ExtDataRule), pointer, intent(in) :: rule
@@ -67,9 +69,9 @@ module mapl3g_PrimaryExport
       type(ESMF_Time), intent(in) :: time_range(:)
       type(ESMF_TimeInterval), intent(in) :: time_step
       integer, optional, intent(out) :: rc
-      
-      type(NonClimDataSetFileSelector) :: non_clim_file_selector 
-      type(ClimDataSetFileSelector) :: clim_file_selector 
+
+      type(NonClimDataSetFileSelector) :: non_clim_file_selector
+      type(ClimDataSetFileSelector) :: clim_file_selector
       type(DataSetNode) :: left_node, right_node
       character(len=:), allocatable :: file_template
       integer :: status, semi_pos
@@ -84,7 +86,7 @@ module mapl3g_PrimaryExport
             non_clim_file_selector = NonClimDataSetFileSelector(collection%file_template, collection%frequency, ref_time=collection%reff_time, persist_closest = (sample%extrap_outside == "persist_closest"), timeStep=time_step )
             allocate(primary_export%file_selector, source=non_clim_file_selector, _STAT)
          end if
-         primary_export%file_var = rule%file_var
+         primary_export%file_vars = rule%file_vars
          primary_export%linear_trans = rule%linear_trans
          if (index(rule%regrid_method, 'FRACTION') > 0) then
             semi_pos = index(rule%regrid_method, ';')
@@ -119,12 +121,6 @@ module mapl3g_PrimaryExport
       bracket = this%bracket
    end function get_bracket
 
-   function get_file_var_name(this) result(varname)
-      character(len=:), allocatable :: varname
-      class(PrimaryExport), intent(in) :: this
-      varname = this%file_var
-   end function get_file_var_name
-
    function get_export_var_name(this) result(varname)
       character(len=:), allocatable :: varname
       class(PrimaryExport), intent(in) :: this
@@ -145,8 +141,10 @@ module mapl3g_PrimaryExport
       type(ESMF_FieldBundle) :: bundle
       type(GeomManager), pointer :: geom_mgr
       type(EsmfRegridderParam) :: regridder_param
+      type(esmf_Info) :: regridder_param_info
       class(VerticalGrid), pointer :: vertical_grid
       type(VerticalGridManager), pointer :: vgrid_manager
+      character(len=:), pointer :: variable_name
 
       if (this%is_constant) then
          _RETURN(_SUCCESS)
@@ -159,26 +157,28 @@ module mapl3g_PrimaryExport
       geom = geom_mgr%get_mapl_geom_from_metadata(metadata%metadata, _RC)
       esmfgeom = geom%get_geom()
 
-      this%vcoord = verticalCoordinate(metadata, this%file_var, _RC)
+      variable_name => this%file_vars%of(1)
+      this%vcoord = verticalCoordinate(metadata, variable_name, _RC)
       regridder_param = generate_esmf_regrid_param(regrid_method_string_to_int(this%regridding_method), &
          ESMF_TYPEKIND_R4, _RC)
+      regridder_param_info = regridder_param%make_info(_RC)
 
       call ESMF_StateGet(exportState, item_name, bundle, _RC)
       if (this%vcoord%vertical_type == NO_COORD) then
-         call MAPL_FieldBundleModify(bundle, geom=esmfgeom, units='<unknown>', typekind=ESMF_TYPEKIND_R4, &
-                 vertical_stagger=VERTICAL_STAGGER_NONE, regridder_param=regridder_param,  _RC)
+         call mapl_FieldBundleSet(bundle, geom=esmfgeom, units='<unknown>', typekind=ESMF_TYPEKIND_R4, &
+                 vert_staggerloc=VERTICAL_STAGGER_NONE, regridder_param_info=regridder_param_info, _RC)
       else if (this%vcoord%vertical_type == SIMPLE_COORD) then
          vertical_grid => vgrid_manager%create_grid(BasicVerticalGridSpec(num_levels=this%vcoord%num_levels), _RC)
-         call MAPL_FieldBundleModify(bundle, geom=esmfgeom, units='<unknown>', &
-                 typekind=ESMF_TYPEKIND_R4, vertical_grid=vertical_grid, &
-                 vertical_stagger=VERTICAL_STAGGER_CENTER, regridder_param=regridder_param,  _RC)
+         call MAPL_FieldBundleSet(bundle, geom=esmfgeom, units='<unknown>', &
+                 typekind=ESMF_TYPEKIND_R4, vgrid=vertical_grid, &
+                 vert_staggerloc=VERTICAL_STAGGER_CENTER, regridder_param_info=regridder_param_info, _RC)
       else
          _FAIL("unsupported vertical coordinate for item "//trim(this%export_var))
       end if
 
       _RETURN(_SUCCESS)
    end subroutine complete_export_spec
-      
+
    subroutine update_export_spec(this, item_name, exportState, rc)
       class(PrimaryExport), intent(inout) :: this
       character(len=*), intent(in) :: item_name
@@ -194,6 +194,7 @@ module mapl3g_PrimaryExport
       type(GeomManager), pointer :: geom_mgr
       type(VerticalGridManager), pointer :: vgrid_manager
       class(VerticalGrid), pointer :: vertical_grid
+      character(len=:), pointer :: variable_name
 
       if (this%is_constant) then
          _RETURN(_SUCCESS)
@@ -205,7 +206,8 @@ module mapl3g_PrimaryExport
       geom = geom_mgr%get_mapl_geom_from_metadata(metadata%metadata, _RC)
       esmfgeom = geom%get_geom()
 
-      this%vcoord = verticalCoordinate(metadata, this%file_var, _RC)
+      variable_name => this%file_vars%of(1)
+      this%vcoord = verticalCoordinate(metadata, variable_name, _RC)
 
       call ESMF_StateGet(exportState, item_name, bundle, _RC)
       if (this%vcoord%vertical_type == NO_COORD) then
@@ -214,7 +216,7 @@ module mapl3g_PrimaryExport
       else if (this%vcoord%vertical_type == SIMPLE_COORD) then
          vertical_grid => vgrid_manager%create_grid(BasicVerticalGridSpec(num_levels=this%vcoord%num_levels), _RC)
          call FieldBundleSet(bundle, geom=esmfgeom, units='<unknown>', &
-                 typekind=ESMF_TYPEKIND_R4, num_levels=this%vcoord%num_levels, &
+                 typekind=ESMF_TYPEKIND_R4, vgrid=vertical_grid, &
                  vert_staggerloc=VERTICAL_STAGGER_CENTER,  _RC)
       else
          _FAIL("unsupported vertical coordinate for item "//trim(this%export_var))
@@ -222,12 +224,12 @@ module mapl3g_PrimaryExport
 
       _RETURN(_SUCCESS)
    end subroutine update_export_spec
-      
+
    subroutine update_my_bracket(this, bundle, current_time, weights, rc)
       class(PrimaryExport), intent(inout) :: this
       type(ESMF_FieldBundle), intent(inout) :: bundle
       type(ESMF_Time), intent(in) :: current_time
-      real, intent(out) :: weights(3)
+      real, allocatable, intent(out) :: weights(:)
       integer, optional, intent(out) :: rc
 
       integer :: status
@@ -235,11 +237,25 @@ module mapl3g_PrimaryExport
 
       call this%file_selector%update_file_bracket(bundle, current_time, this%bracket, _RC)
       local_weights = this%bracket%compute_bracket_weights(current_time, _RC)
-      weights = [0.0, local_weights(1), local_weights(2)]
 
-      ! apply optional linear transformation
-      weights(1) = this%linear_trans(1)
-      weights(2:3) = weights(2:3)*this%linear_trans(2)
+      if (this%file_vars%size() == 1) then
+         allocate(weights(3),_STAT)
+         weights = [0.0, local_weights(1), local_weights(2)]
+         ! apply optional linear transformation
+         weights(1) = this%linear_trans(1)
+         weights(2:3) = weights(2:3)*this%linear_trans(2)
+      else if (this%file_vars%size() == 2) then
+         allocate(weights(5),_STAT)
+         weights = 0.0
+         weights(2) = local_weights(1)
+         weights(4) = local_weights(2)
+         weights(3) = local_weights(1)
+         weights(5) = local_weights(2)
+         ! apply optional linear transformation
+         weights(1) = this%linear_trans(1)
+         weights(2:5) = weights(2:5)*this%linear_trans(2)
+      end if
+
       _RETURN(_SUCCESS)
    end subroutine update_my_bracket
 
@@ -256,8 +272,11 @@ module mapl3g_PrimaryExport
       logical :: update_file
       type(ESMF_Field), allocatable :: field_list(:)
       character(len=:), allocatable :: filename
-      integer :: time_index
-     
+      integer :: time_index,i,list_start
+      character(len=:), pointer :: variable_name
+
+      list_start=1
+      if (this%file_vars%size() == 2) list_start = 2
       node = this%bracket%get_left_node()
       update_file = node%get_update()
       if (update_file) then
@@ -268,7 +287,10 @@ module mapl3g_PrimaryExport
          call node%get_file(filename)
          call lgr%info("updating %a", this%export_var)
          call node%write_node(lgr) !  bmaa
-         call reader%add_item(field_list(1), this%file_var, filename, time_index, this%client_collection_id, _RC)
+         do i=1,this%file_vars%size()
+            variable_name => this%file_vars%at(i)
+            call reader%add_item(field_list(i), variable_name, filename, time_index, this%client_collection_id, _RC)
+         enddo
       end if
       node = this%bracket%get_right_node()
       update_file = node%get_update()
@@ -280,7 +302,10 @@ module mapl3g_PrimaryExport
          call lgr%info("updating %a", this%export_var)
          call node%write_node(lgr) !  bmaa
          call node%get_file(filename)
-         call reader%add_item(field_list(2), this%file_var, filename, time_index, this%client_collection_id, _RC)
+         do i=1,this%file_vars%size()
+            variable_name => this%file_vars%at(i)
+            call reader%add_item(field_list(list_start+i), variable_name, filename, time_index, this%client_collection_id, _RC)
+         enddo
       end if
 
       _RETURN(_SUCCESS)
@@ -309,7 +334,7 @@ module mapl3g_PrimaryExport
          else
             _FAIL('Unsupported typekind')
          end if
-      enddo 
+      enddo
       _RETURN(_SUCCESS)
 
    end subroutine set_fraction_values_to_zero

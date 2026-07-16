@@ -1,39 +1,43 @@
 #include "MAPL.h"
+
 module mapl3g_BasicVerticalGrid
+
    use mapl3g_VerticalGrid, only: VerticalGrid
    use mapl3g_VerticalGridSpec, only: VerticalGridSpec
    use mapl3g_VerticalGridFactory, only: VerticalGridFactory
    use mapl3g_ComponentDriver, only: ComponentDriver
-   use pfio, only: FileMetadata
+   !use pfio, only: FileMetadata
+   use pfio
    use esmf
    use mapl3g_VerticalStaggerLoc, only: VerticalStaggerLoc
    use gftl2_StringVector, only: StringVector
    use mapl_ErrorHandling
+
    implicit none(type,external)
    private
-   
+
    public :: BasicVerticalGrid
    public :: BasicVerticalGridSpec
    public :: BasicVerticalGridFactory
-   
+
    ! Spec type
    type, extends(VerticalGridSpec) :: BasicVerticalGridSpec
       integer :: num_levels
    end type BasicVerticalGridSpec
-   
+
    ! Grid type
-   type, extends(VerticalGrid) :: BasicVerticalGrid
-      private
-      type(BasicVerticalGridSpec) :: spec
-   contains
-      procedure :: initialize
-      procedure :: get_num_levels
-      procedure :: get_coordinate_field
-      procedure :: get_supported_physical_dimensions
-      procedure :: get_units
-      procedure :: matches
-   end type BasicVerticalGrid
-   
+    type, extends(VerticalGrid) :: BasicVerticalGrid
+       private
+       type(BasicVerticalGridSpec) :: spec
+    contains
+       procedure :: initialize
+       procedure :: get_num_layers
+       procedure :: get_coordinate_field
+       procedure :: get_supported_physical_dimensions
+       procedure :: get_units
+       procedure :: matches
+    end type BasicVerticalGrid
+
    ! Factory type
    type, extends(VerticalGridFactory) :: BasicVerticalGridFactory
    contains
@@ -51,39 +55,43 @@ contains
    subroutine initialize(this, spec)
       class(BasicVerticalGrid), intent(inout) :: this
       type(BasicVerticalGridSpec), intent(in) :: spec
-      
+
       this%spec = spec
+      ! Default coordinate direction is already set to VCOORD_DIRECTION_DOWN in VerticalGrid
    end subroutine initialize
 
-   function get_num_levels(this) result(num_levels)
-      integer :: num_levels
+   function get_num_layers(this) result(num_layers)
+      integer :: num_layers
       class(BasicVerticalGrid), intent(in) :: this
-      
-      num_levels = this%spec%num_levels
-   end function get_num_levels
 
-   function get_coordinate_field(this, geom, physical_dimension, units, typekind, coupler, rc) result(field)
+      num_layers = this%spec%num_levels
+   end function get_num_layers
+
+   function get_coordinate_field(this, physical_dimension, aspects, coupler, rc) result(field)
       type(esmf_Field) :: field
       class(BasicVerticalGrid), intent(in) :: this
-      type(esmf_Geom), intent(in) :: geom
       character(len=*), intent(in) :: physical_dimension
-      character(len=*), intent(in) :: units
-      type(esmf_TypeKind_Flag), intent(in) :: typekind
+      class(*), intent(in) :: aspects
       class(ComponentDriver), pointer, intent(out) :: coupler
       integer, intent(out), optional :: rc
 
       integer :: status
 
       coupler => null()
+      field = ESMF_FieldEmptyCreate(_RC)
+
       _FAIL('BasicVerticalGrid should have been connected to a different subclass before this is called.')
 
+      _UNUSED_DUMMY(this)
+      _UNUSED_DUMMY(physical_dimension)
+      _UNUSED_DUMMY(aspects)
    end function get_coordinate_field
 
    ! New method: get supported physical dimensions
    function get_supported_physical_dimensions(this) result(dimensions)
       type(StringVector) :: dimensions
       class(BasicVerticalGrid), target, intent(in) :: this
-      
+
       call dimensions%push_back("<unknown>")
    end function get_supported_physical_dimensions
 
@@ -93,24 +101,29 @@ contains
       class(BasicVerticalGrid), intent(in) :: this
       character(len=*), intent(in) :: physical_dimension
       integer, optional, intent(out) :: rc
-      
+
       units = "<unknown>"
       _RETURN(_SUCCESS)
+
+      _UNUSED_DUMMY(this)
+      _UNUSED_DUMMY(physical_dimension)
    end function get_units
 
    logical function matches(this, other)
       class(BasicVerticalGrid), intent(in) :: this
       class(VerticalGrid), intent(in) :: other
 
-      matches = this%get_num_levels() == other%get_num_levels()
+      matches = this%get_num_layers() == other%get_num_layers()
    end function matches
 
    ! Factory methods
    function get_name(this) result(name)
       character(len=:), allocatable :: name
       class(BasicVerticalGridFactory), intent(in) :: this
-      
+
       name = "BasicVerticalGrid"
+
+      _UNUSED_DUMMY(this)
    end function get_name
 
    function supports_spec(this, spec, rc) result(is_supported)
@@ -119,12 +132,12 @@ contains
       class(VerticalGridSpec), intent(in) :: spec
       integer, optional, intent(out) :: rc
 
-      integer :: status
       type(BasicVerticalGridSpec) :: basic_spec
 
       is_supported = same_type_as(spec, basic_spec)
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function supports_spec
 
    function supports_file_metadata(this, file_metadata, rc) result(is_supported)
@@ -132,10 +145,11 @@ contains
       class(BasicVerticalGridFactory), intent(in) :: this
       type(FileMetadata), intent(in), target :: file_metadata
       integer, optional, intent(out) :: rc
-      
+
       ! Basic grid can work with any file metadata as a fallback
       is_supported = .true.
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function supports_file_metadata
 
    function supports_config(this, config, rc) result(is_supported)
@@ -162,6 +176,7 @@ contains
       is_supported = has_num_levels
 
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function supports_config
 
    function create_spec_from_config(this, config, rc) result(spec)
@@ -169,23 +184,24 @@ contains
       class(BasicVerticalGridFactory), intent(in) :: this
       type(esmf_HConfig), intent(in), target :: config
       integer, intent(out), optional :: rc
-      
+
       type(BasicVerticalGridSpec) :: local_spec
       integer :: status
-      
+
       ! Get number of levels if specified, otherwise use default
       if (esmf_HConfigIsDefined(config, keyString="num_levels")) then
          local_spec%num_levels = esmf_HConfigAsI4(config, keyString="num_levels", _RC)
       else
          local_spec%num_levels = 1  ! Default for basic grid
       end if
-      
+
       _ASSERT(local_spec%num_levels > 0, 'Number of levels must be positive')
-      
+
       ! Use polymorphic allocation
       allocate(spec, source=local_spec)
-      
+
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function create_spec_from_config
 
    function create_spec_from_file_metadata(this, file_metadata, rc) result(spec)
@@ -193,16 +209,44 @@ contains
       class(BasicVerticalGridFactory), intent(in) :: this
       type(FileMetadata), intent(in), target :: file_metadata
       integer, intent(out), optional :: rc
-      
+
       type(BasicVerticalGridSpec) :: local_spec
+      character(:), allocatable :: lev_name
       integer :: status
-      
-      ! For basic grid, just create a single-level spec as fallback
-      local_spec%num_levels = 1
-      
-      allocate(spec, source=local_spec)
-      
+
+      ! Guarantee valid return in case of error
+      local_spec%num_levels = -1
+      allocate(spec, source=local_Spec)
+
+      lev_name = find_lev_name()
+      local_spec%num_levels = file_metadata%get_dimension(lev_name,rc=status)
+
+      if (status /= pFIO_DIMENSION_NOT_FOUND) then
+         deallocate(spec)
+         allocate(spec, source=local_spec)
+      end if
+
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
+
+   contains
+
+      function find_lev_name(rc) result(lev_name)
+         character(len=:), allocatable :: lev_name
+         integer, optional, intent(out) :: rc
+
+         integer :: status
+
+         if (file_metadata%has_dimension('lev')) then
+            lev_name = 'lev'
+            _RETURN(_SUCCESS)
+            _UNUSED_DUMMY(this)
+         end if
+
+         lev_name = ''
+         _RETURN(_SUCCESS)
+      end function find_lev_name
+
    end function create_spec_from_file_metadata
 
    function create_grid_from_spec(this, spec, rc) result(grid)
@@ -210,10 +254,9 @@ contains
       class(BasicVerticalGridFactory), intent(in) :: this
       class(VerticalGridSpec), intent(in) :: spec
       integer, intent(out), optional :: rc
-      
+
       type(BasicVerticalGrid) :: local_grid
-      integer :: status
-      
+
       select type (spec)
       type is (BasicVerticalGridSpec)
          call local_grid%initialize(spec)
@@ -221,8 +264,9 @@ contains
       class default
          _RETURN(_FAILURE)
       end select
-      
+
       _RETURN(_SUCCESS)
+      _UNUSED_DUMMY(this)
    end function create_grid_from_spec
 
 end module mapl3g_BasicVerticalGrid
