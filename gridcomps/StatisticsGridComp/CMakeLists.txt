@@ -17,5 +17,6 @@ esma_add_library(${this}
   SRCS ${srcs}
   DEPENDENCIES MAPL MAPL.utilities TYPE SHARED)
 
-add_subdirectory(tests)
+# Do not build tests for GCHP
+#add_subdirectory(tests)
 

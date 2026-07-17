@@ -7,8 +7,9 @@ set(srcs
   MeshElementVector.F90
   Mesh.F90
 )
-find_package (GFTL REQUIRED)
-find_package (GFTL_SHARED REQUIRED)
+# Comment out for GCHP since built as part of project
+#find_package (GFTL REQUIRED)
+#find_package (GFTL_SHARED REQUIRED)
 
 esma_add_library (${this}
   SRCS ${srcs}
