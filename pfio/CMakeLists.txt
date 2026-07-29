@@ -170,7 +170,8 @@ else ()
   message(STATUS "netCDF does not have zstandard capability")
 endif ()
 
-add_subdirectory (programs)
+# GCHP: do not include programs
+#add_subdirectory (programs)
 
 #--------------------
 # Copy include files that are used by other libraries.

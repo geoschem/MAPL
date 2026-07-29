@@ -245,7 +245,8 @@ include(mapl_acg)
 include(mapl_create_stub_component)
 
 add_subdirectory (apps)
-add_subdirectory (tests)
+# Exclude Tests in GCHP
+#add_subdirectory (tests)
 
 # @env will exist here if MAPL is built as itself but not as part of, say, GEOSgcm
 esma_add_subdirectory (ESMA_env FOUND ESMA_env_FOUND)
