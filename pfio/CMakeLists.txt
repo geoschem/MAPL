@@ -100,7 +100,9 @@ set (srcs
 #  find_package (PFLOGGER REQUIRED)
 #endif ()
 
-esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.utils MAPL.mp_utils NetCDF::NetCDF_Fortran NetCDF::NetCDF_C TYPE SHARED)
+# Exclude NetCDF_C dependency in GCHP since only needed for executables not added
+#esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.utils MAPL.mp_utils NetCDF::NetCDF_Fortran NetCDF::NetCDF_C TYPE SHARED)
+esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.utils MAPL.mp_utils NetCDF::NetCDF_Fortran TYPE SHARED)
 
 target_link_libraries (${this} PUBLIC GFTL::gftl-v2 GFTL_SHARED::gftl-shared-v2 GFTL_SHARED::gftl-shared PFLOGGER::pflogger PRIVATE MPI::MPI_Fortran OpenMP::OpenMP_Fortran)
 target_include_directories (${this} PUBLIC
