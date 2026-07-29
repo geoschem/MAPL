@@ -10,10 +10,11 @@ set (srcs
     FieldDictionaryConfig.F90
 )
 
-if (BUILD_WITH_PFLOGGER)
-    find_package (PFLOGGER REQUIRED)
-endif ()
-find_package (GFTL_SHARED REQUIRED)
+# Comment out for GCHP since built as part of project
+#if (BUILD_WITH_PFLOGGER)
+#    find_package (PFLOGGER REQUIRED)
+#endif ()
+#find_package (GFTL_SHARED REQUIRED)
 
 esma_add_library (${this}
     SRCS ${srcs}

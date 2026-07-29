@@ -95,9 +95,10 @@ set (srcs
   StringVectorUtil.F90
   )
 
-if (BUILD_WITH_PFLOGGER)
-  find_package (PFLOGGER REQUIRED)
-endif ()
+# Comment out for GCHP since built as part of project
+#if (BUILD_WITH_PFLOGGER)
+#  find_package (PFLOGGER REQUIRED)
+#endif ()
 
 esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.utils MAPL.mp_utils NetCDF::NetCDF_Fortran NetCDF::NetCDF_C TYPE SHARED)
 
@@ -183,7 +184,8 @@ if (LATEX_FOUND)
 endif ()
 
 
-# Unit testing
-if (PFUNIT_FOUND)
-  add_subdirectory(tests EXCLUDE_FROM_ALL)
-endif ()
+# GCHP: do not include tests
+## Unit testing
+#if (PFUNIT_FOUND)
+#  add_subdirectory(tests EXCLUDE_FROM_ALL)
+#endif ()
