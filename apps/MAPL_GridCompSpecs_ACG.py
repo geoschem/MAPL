@@ -449,8 +449,9 @@ def read_specs(specs_filename):
         """ Read a csv reader iterator until a blank line is found. """
         prev_row_blank = True
         for row in csv_reader:
-            if not (len(row) == 0):
-                if row[0].startswith('#'):
+            stripped_row = [cell.strip() for cell in row]
+            if any(stripped_row):
+                if stripped_row[0].startswith('#'):
                     continue
                 yield [cell.strip() for cell in row]
                 prev_row_blank = False
