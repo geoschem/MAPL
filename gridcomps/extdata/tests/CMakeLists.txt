@@ -4,7 +4,7 @@ set (test_srcs
   Test_ExtDataNodeBracket.pf
   )
 
-if (${GEOS_SITE} MATCHES "NCCS" OR ${GEOS_SITE} MATCHES "GMAO.desktop") 
+if (DEFINED ENV{LOCAL_REGRESSION_DATA_DIR} AND IS_DIRECTORY "$ENV{LOCAL_REGRESSION_DATA_DIR}")
   list(APPEND test_srcs Test_NonClimDataSetFileSelector.pf)
   list(APPEND test_srcs Test_DataSetNode.pf)
 endif ()
@@ -18,7 +18,7 @@ add_pfunit_ctest(MAPL.extdata.tests
                 MAX_PES 1
                 )
 set_target_properties(MAPL.extdata.tests PROPERTIES Fortran_MODULE_DIRECTORY ${MODULE_DIRECTORY})
-set_tests_properties(MAPL.extdata.tests PROPERTIES LABELS "ESSENTIAL")
+# set_tests_properties(MAPL.extdata.tests PROPERTIES LABELS "REGRESSION")
 
 if (APPLE)
   set(LD_PATH "DYLD_LIBRARY_PATH")
@@ -27,6 +27,7 @@ else()
 endif ()
 
 set(TEST_ENV "${LD_PATH}=${CMAKE_CURRENT_BINARY_DIR}/gridcomps:$ENV{${LD_PATH}}")
+list(APPEND TEST_ENV "LOCAL_REGRESSION_DATA_DIR=$ENV{LOCAL_REGRESSION_DATA_DIR}")
 
 if(${GEOS_SITE} STREQUAL "NCCS" AND ${MPI_STACK} STREQUAL "intelmpi")
   list(APPEND TEST_ENV "I_MPI_OFI_PROVIDER=psm3")

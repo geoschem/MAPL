@@ -51,7 +51,8 @@ function(run_case)
     endif()
   endforeach()
 
-  # Run Regrid_Util.x via mpiexec in the temp directory
+  # --- Run 1: command-line arguments ---
+
   execute_process(
     COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${NPET} ${MPIEXEC_PREFLAGS}
             ${MY_BINARY_DIR}/Regrid_Util.x ${CMD_LINE_LIST}
@@ -59,24 +60,59 @@ function(run_case)
     RESULT_VARIABLE RUN_RESULT
   )
 
-  # Verify the output file was produced
   if(NOT EXISTS "${TMP_DIR}/output_from_run.nc4")
     file(REMOVE_RECURSE "${TMP_DIR}")
     message(FATAL_ERROR
-      "Test '${TEST_CASE}' failed: Regrid_Util.x did not produce output_from_run.nc4 "
+      "Test '${TEST_CASE}' (cmd-line run) failed: Regrid_Util.x did not produce output_from_run.nc4 "
       "(mpiexec exit code: ${RUN_RESULT})"
     )
   endif()
 
-  # Compare output against the reference
+  # References were generated with ifort. Permit GNU compiler roundoff on
+  # large-magnitude fields while retaining an absolute bound near zero.
   execute_process(
-    COMMAND nccmp -d "${TMP_DIR}/output_from_run.nc4" "${TMP_DIR}/output.nc4"
+    COMMAND nccmp -dmfgsB --tolerance 1e-4 --Tolerance 1e-4 --join-tolerance
+            "${TMP_DIR}/output_from_run.nc4" "${TMP_DIR}/output.nc4"
     RESULT_VARIABLE CMP_RESULT
   )
   if(NOT CMP_RESULT EQUAL 0)
     file(REMOVE_RECURSE "${TMP_DIR}")
     message(FATAL_ERROR
-      "Test '${TEST_CASE}' failed: output_from_run.nc4 differs from reference output.nc4"
+      "Test '${TEST_CASE}' (cmd-line run) failed: output_from_run.nc4 differs from reference output.nc4"
+    )
+  endif()
+
+  # Remove output before YAML run so a stale file cannot mask a real failure
+  file(REMOVE "${TMP_DIR}/output_from_run.nc4")
+
+  # --- Run 2: YAML config file ---
+
+  set(YAML_CONFIG "${CASE_SOURCE_DIR}/config.yaml")
+
+  execute_process(
+    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${NPET} ${MPIEXEC_PREFLAGS}
+            ${MY_BINARY_DIR}/Regrid_Util.x --config "${YAML_CONFIG}"
+    WORKING_DIRECTORY "${TMP_DIR}"
+    RESULT_VARIABLE YAML_RUN_RESULT
+  )
+
+  if(NOT EXISTS "${TMP_DIR}/output_from_run.nc4")
+    file(REMOVE_RECURSE "${TMP_DIR}")
+    message(FATAL_ERROR
+      "Test '${TEST_CASE}' (yaml run) failed: Regrid_Util.x did not produce output_from_run.nc4 "
+      "(mpiexec exit code: ${YAML_RUN_RESULT})"
+    )
+  endif()
+
+  execute_process(
+    COMMAND nccmp -dmfgsB --tolerance 1e-4 --Tolerance 1e-4 --join-tolerance
+            "${TMP_DIR}/output_from_run.nc4" "${TMP_DIR}/output.nc4"
+    RESULT_VARIABLE YAML_CMP_RESULT
+  )
+  if(NOT YAML_CMP_RESULT EQUAL 0)
+    file(REMOVE_RECURSE "${TMP_DIR}")
+    message(FATAL_ERROR
+      "Test '${TEST_CASE}' (yaml run) failed: output_from_run.nc4 differs from reference output.nc4"
     )
   endif()
 

@@ -77,6 +77,7 @@ contains
       type(StateItemSpecPtr), target, allocatable :: src_extensions(:), dst_extensions(:)
       type(StateItemSpec), pointer :: src_extension, dst_extension
       type(StateItemSpec), pointer :: spec
+      character(:), allocatable :: error_message
       integer :: i
       integer :: status
 
@@ -89,9 +90,13 @@ contains
       _ASSERT(associated(src_registry), 'Unknown source registry')
       _ASSERT(associated(dst_registry), 'Unknown destination registry')
 
-      _ASSERT(dst_registry%has_virtual_pt(dst_pt%v_pt), "connection to unknown src_pt")
+      error_message = "Unknown destination v_pt '" // dst_pt%v_pt%get_full_name() // &
+           "' for component '" // dst_pt%component_name // "'"
+      _ASSERT(dst_registry%has_virtual_pt(dst_pt%v_pt), error_message)
       dst_extensions = dst_registry%get_specs(dst_pt%v_pt, _RC)
-      _ASSERT(src_registry%has_virtual_pt(src_pt%v_pt), "connection to unknown src_pt")
+      error_message = "Unknown source v_pt '" // src_pt%v_pt%get_full_name() // &
+           "' for component '" // src_pt%component_name // "'"
+      _ASSERT(src_registry%has_virtual_pt(src_pt%v_pt), error_message)
       src_extensions = src_registry%get_specs(src_pt%v_pt, _RC)
 
       do i = 1, size(dst_extensions)
@@ -166,11 +171,7 @@ contains
       dst_pt = this%get_destination()
       dst_extensions = dst_registry%get_specs(dst_pt%v_pt, _RC)
 
-      ! Very useful for debugging:
-!#      _HERE, 'src component: ', src_pt%component_name, ' :: ', src_pt%v_pt
-!#      _HERE, 'dst component: ', dst_pt%component_name, ' :: ', dst_pt%v_pt
       do i = 1, size(dst_extensions)
-
          dst_extension => dst_extensions(i)%ptr
          dst_spec => dst_extension
 
@@ -180,6 +181,14 @@ contains
          effective_pt = ActualConnectionPt(VirtualConnectionPt(ESMF_STATEINTENT_IMPORT, &
               src_pt%v_pt%get_comp_name()//'/'//src_pt%v_pt%get_esmf_name()))
          new_spec => new_extension
+         block
+           ! new_spec might be src_spec in which case it is already allocated
+           logical :: is_allocated
+           is_allocated = new_spec%is_allocated(_RC)
+           if (.not. is_allocated) then
+              call new_spec%allocate(_RC)
+           end if
+         end block
 
          call dst_spec%connect(new_spec, effective_pt, _RC)
          if (new_extension%has_producer()) then
@@ -220,4 +229,3 @@ contains
    end subroutine activate_dependencies
 
 end module mapl_SimpleConnection_mod
-

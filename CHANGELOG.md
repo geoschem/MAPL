@@ -9,8 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 <!-- mlc-enable -->
 
+### Fixed
+
+- Fixed corrupted cubed-sphere coordinate endpoints in NAG-generated output
+- Fixed documentation workflows so manual runs publish only from trusted branches and v2 and MAPL3 documentation deployments preserve each other's output
+- Removed deployment and build-cache credentials from pull request jobs and restricted PR workflow tokens to read-only access
+- Dangling pointer in ExtDataFileReader due to a missing target attribute on ExtDataReader
+- Fixed omission of setting FieldBundle allocation status in create() for ServiceClassAspect
+
 ### Changed
 
+- Reworked MAPL phases to better align with NUOPC phases.
+- Simplified the `CMakeLists.txt` ESMF handling: `ESMA_cmake` now creates the NetCDF/HDF5/ESMF/MPI targets and enforces a minimum ESMF version for both Baselibs and Spack builds automatically, so the manual `if (NOT Baselibs_FOUND) ... else () ... endif ()` block is no longer needed. MAPL3's stricter ESMF >= 9.0.0 requirement is now expressed by setting `ESMA_ESMF_MIN_VERSION` before `include(esma)`.
+  - Update `components.yaml`
+    - ESMA_env v5.26.0
+    - ESMA_cmake v4.46.0
+    - ecbuild geos/v3.15.2
+- Split cap.yaml into mapl.yaml, cap_driver.yaml, and cap_gridcomp.yaml (see issue #5355)
+- Renamed `model_petcount`/`has_model_petcount` to `app_petcount`/`has_app_petcount`
+  throughout the codebase, config files, and documentation
+- Renamed `mapl/Cap.F90` to `mapl/CapDriver.F90` and its module `mapl_Cap_mod` to `mapl_CapDriver_mod`
+- `MAPL_Initialize` gained a new optional `app_config` (intent(out)) argument that resolves
+  and returns the `app.config`-derived hconfig (i.e. the `cap_driver.yaml` contents); `mapl/GEOS.F90`
+  passes this through to `MAPL_CapCreate`/`MAPL_CapRun` via a new `config` argument on
+  both, so `cap_driver.yaml` is parsed from disk only once instead of independently in each procedure
+- Moved `mapl/cap_gridcomp.yaml` to `gridcomps/cap/cap_gridcomp.yaml`, replacing the stale
+  `gridcomps/cap/CapGridComp.yaml` (which used outdated `root`/`extdata`/`history` keys no
+  longer read by `CapGridComp.F90`, which reads `root_name`/`extdata_name`/`history_name`)
+- Moved the `gridcomp_config` key out of `mapl.yaml`'s `app:` section into `cap_driver.yaml`
+  as `cap_gridcomp_config`, so `mapl.yaml`'s `app:` section only points at `cap_driver.yaml`
+  (via `config`), and `cap_driver.yaml` in turn points at `cap_gridcomp.yaml`
+- For vector items in ExtData change variables separted by `;` to a sequence of variables like History
+- Moved DSO-backed child `setServices` ownership into child configurations and added support for raw `ESMF_GridCompCreate` followed by `ESMF_GridCompSetServices` startup.
+- Refactored `UserSetServices.F90` to remove the `user_setservices` interface, rename `AbstractUserSetServices` to `UserSetServices`, and giving `ProcSetServices` and `DSOSetServices` their own constructors
 - `Regrid_Util.x` now uses the fargparse library for command line argument parsing instead
   of raw Fortran intrinsics. Multi-character options that previously used a single-dash prefix
   (e.g. `-ogrid`, `-nx`, `-ny`, `-method`, `-tp_in`, `-tp_out`, `-lon_range`, `-lat_range`,
@@ -18,10 +49,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `-zstandard_level`, `-file_weights`, `-vars`, `-t`) now require a double-dash prefix
   (e.g. `--ogrid`, `--nx`). The short forms `-i` and `-o` are preserved. The `--help` flag
   is now handled automatically by fargparse and prints a formatted usage summary.
+- Removed unused fields and methods from InnerMetaComponent
 
 ### Added
 
+- Added `StateGetPointer` overloads for retrieving paired (u, v) field pointers from a vector-type ESMF FieldBundle stored in a state
+- Added `extdata_dryrun_check.py`, a Python utility that predicts which input
+  files an ExtData component will need for a given run without executing the
+  model. Supports three tiers: template enumeration (Tier 1), filesystem
+  existence check (Tier 2, `--check`), and time-axis narrowing via `netCDF4`
+  (Tier 3, `--narrow`). A `--verify_files_read` flag compares predictions
+  against the runtime `log_files_read` output for use in CTest. Wired into
+  the MAPL3G component test framework for case02, case11, and case23.
+- Added `latlon_to_face.py`, a Python utility that converts a cubed-sphere
+  NetCDF file from tiled lat/lon layout (`lat = 6 * lon`) to the face layout
+  (`nf / Ydim / Xdim`) required by MAPL/GEOS face-format readers.
+- Added new GEOShs CI test
+- Added capability for doing in-memory checkpoint/restart.  Testing remains fairly basic, so further work is likely needed when we port replay to MAPL3.
+- Added `log_files_read` option to ExtData2G to easily log all files read during a run
+- Added `MAPL_FieldApplyUserRoutine`/`MAPL_FieldBundleApplyUserRoutine` to apply a user routine to each slice of a field (or every field in a bundle) with ungridded/vertical dimensions, plus `MAPL_FieldGetPointerToSlice` (overloaded for R4 and R8) for typed per-slice access. Slices are 2D by default, or 3D when the field has exactly three non-ungridded (grid + vertical) dimensions (for example a 4D field whose fourth dimension is the ungridded dimension). The slice-routine interface is unlimited-polymorphic and assumed-rank, so a single user routine handles R4/R8 and 2D/3D slices via `select rank`/`select type`
+- `update_restart` in `CapDriver.F90` now supports a `skip_restart_write` boolean flag in the
+  `ESMF_HConfig`. When present and `true`, the routine returns immediately without writing
+  the restart file. Default behavior (key absent or `false`) is unchanged.
+
+- `Regrid_Util.x` now has the option to be drive via a yaml file passed on the command line rather than
+   a whole list of command line arguments.
+
+- Modified ExtData tests to get path to test data from environment variable `LOCAL_REGRESSION_DATA_DIR`
+
 - Added regression test for Regrid\_Util.x
+
 - External pfio server GridComp and ctest: new `mapl_PfioServerGridComp_mod` provides
   an ESMF GridComp whose `run` phase creates and starts an `MpiServer` or
   `MultiGroupServer`; `MaplFramework` gains `mapl_connect_to_server`,
@@ -40,7 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constants throughout `MaplFramework`, `RestartHandler`, `GeomPFIO`, `GridPFIO`,
   `FieldBundleRead`, `FieldBundleWrite`, `HistoryGridComp`, `ExtDataFileReader`, and
   `PrimaryExport`; fixed `MAX_LEN_PORT_NAME` (16 → 64) to support longer port names
-
 - Added `MAPL_StateMerge` to combine two `ESMF_State` objects into one without allocating new field memory
 - MAPL3 initialization lifecycle (#5231): new 6-call application lifecycle
   (`MAPL_Initialize`, `MAPL_CreateServers`, `MAPL_CapCreate`, `MAPL_RunServers`,
@@ -89,13 +145,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Add helper script for regression test work
 - For ACG, only declare pointer and get_pointer for MAPL_STATEITEM_FIELD
 - For ACG, add spec_filters to generalize testing specs
+- Improved error handling for issues writing netcdf files
+
 
 ### Fixed
 
+- Fixed restart handler so checkpoints have data in the coordinate variables.
+- Fixed the unreliable feedback from Python bridge failures
+- Improved `SimpleConnection` assertion messages for unknown virtual connection points
 - Fixed bug in FieldBundleRead when file grid and output bundle grid are different grid classes
 - Buggy logic in server initialization (#5214)
 - Missing call to initialize error handling in MPI context
 - Fixed bug that prevented R8 exports from being written in R8 in History
+- Fixed bug causing 'already allocated' error when setting corner longitudes in cubed-sphere History files
 
 ### Removed
 
