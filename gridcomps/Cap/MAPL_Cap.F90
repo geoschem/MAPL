@@ -353,11 +353,15 @@ contains
       call this%cap_gc%finalize(rc=status)
       _VERIFY(status)
 
-      call ESMF_Finalize(endflag=ESMF_END_KEEPMPI, rc=status)
-      _VERIFY(status)
       call stop_timer()
 
       call report_throughput()
+
+      call MAPL_Finalize(comm=this%comm_world, rc=status)
+      _VERIFY(status)
+
+      call ESMF_Finalize(endflag=ESMF_END_KEEPMPI, rc=status)
+      _VERIFY(status)
 
       _RETURN(_SUCCESS)
    contains
@@ -559,19 +563,29 @@ contains
    end subroutine chdir
 
    subroutine finalize_mpi(this, unusable, rc)
-      class (MAPL_Cap), intent(in) :: this
-      class (KeywordEnforcer), optional, intent(in) :: unusable
-      integer, optional, intent(out) :: rc
 
-      integer :: status
-      _UNUSED_DUMMY(unusable)
+     use, intrinsic :: iso_c_binding, only: c_int
 
-      call MAPL_Finalize(comm=this%comm_world)
-      if (.not. this%mpi_already_initialized) then
-         call MPI_Finalize(status)
-      end if
+     class (MAPL_Cap), intent(in) :: this
+     class (KeywordEnforcer), optional, intent(in) :: unusable
+     integer, optional, intent(out) :: rc
 
-      _RETURN(_SUCCESS)
+     interface
+        subroutine c_exit(istatus) bind(c, name="_exit")
+          import c_int
+          integer(c_int), value :: istatus
+        end subroutine c_exit
+     end interface
+
+     integer :: status
+     _UNUSED_DUMMY(unusable)
+
+     if (.not. this%mpi_already_initialized) then
+        call MPI_Barrier(this%comm_world, status)
+        call c_exit(0_c_int)
+     end if
+
+     _RETURN(_SUCCESS)
 
    end subroutine finalize_mpi
 
