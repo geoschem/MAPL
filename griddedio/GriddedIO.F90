@@ -45,8 +45,11 @@ module MAPL_GriddedIOMod
      type(ESMF_Time) :: startTime
      integer :: regrid_method = REGRID_METHOD_BILINEAR
      integer :: nbits_to_keep = MAPL_NBITS_NOT_SET
-     real, allocatable :: lons(:,:),lats(:,:)
-     real, allocatable :: corner_lons(:,:),corner_lats(:,:)
+!ewl     real, allocatable :: lons(:,:),lats(:,:)
+!ewl     real, allocatable :: corner_lons(:,:),corner_lats(:,:)
+! replace with:
+     real(REAL64), allocatable :: lons(:,:),lats(:,:)
+     real(REAL64), allocatable :: corner_lons(:,:),corner_lats(:,:)
      real, allocatable :: times(:)
      type(TimeData) :: timeInfo
      type(VerticalData) :: vdata
