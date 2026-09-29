@@ -122,56 +122,58 @@ endif ()
 # Check to see if quantize capability is present in netcdf-c. #
 ###############################################################
 
-include(CheckCSourceCompiles)
-get_target_property(_netcdf_c_include_dirs NetCDF::NetCDF_C INTERFACE_INCLUDE_DIRECTORIES)
-set(CMAKE_REQUIRED_INCLUDES ${_netcdf_c_include_dirs})
-check_c_source_compiles("
-  #include <netcdf_meta.h>
-  #if !NC_HAS_QUANTIZE
-  choke me
-  #endif
-  int main(void) {
-    return 0;
-  }
-  "
-  NETCDF_HAS_QUANTIZE)
-if (NETCDF_HAS_QUANTIZE)
-  message(STATUS "netCDF has quantize capability")
-  target_compile_definitions(${this} PRIVATE NF_HAS_QUANTIZE)
-else ()
-  message(STATUS "netCDF does not have quantize capability")
-endif ()
+# Skip this section for GCHP
+#include(CheckCSourceCompiles)
+#get_target_property(_netcdf_c_include_dirs NetCDF::NetCDF_C INTERFACE_INCLUDE_DIRECTORIES)
+#set(CMAKE_REQUIRED_INCLUDES ${_netcdf_c_include_dirs})
+#check_c_source_compiles("
+#  #include <netcdf_meta.h>
+#  #if !NC_HAS_QUANTIZE
+#  choke me
+#  #endif
+#  int main(void) {
+#    return 0;
+#  }
+#  "
+#  NETCDF_HAS_QUANTIZE)
+#if (NETCDF_HAS_QUANTIZE)
+#  message(STATUS "netCDF has quantize capability")
+#  target_compile_definitions(${this} PRIVATE NF_HAS_QUANTIZE)
+#else ()
+#  message(STATUS "netCDF does not have quantize capability")
+#endif ()
 
 ################################################################
 # Check to see if zstandard capability is present in netcdf-c. #
 ################################################################
 
-check_c_source_compiles("
-  #include <netcdf_meta.h>
-  #if !NC_HAS_ZSTD
-  choke me
-  #endif
-  int main(void) {
-    return 0;
-  }
-  "
-  NETCDF_HAS_ZSTD)
-
-# NOTE: Even if the check above succeeds, zstandard is *not*
-# possible with Baselibs (builds HDF5, netCDF as static)
-# so we want to check for Baselibs first.
-
-if (Baselibs_FOUND)
-  message(STATUS "Baselibs found, zstandard capability not possible")
-  set(NETCDF_HAS_ZSTD FALSE CACHE BOOL "netCDF has zstandard capability" FORCE)
-endif ()
-
-if (NETCDF_HAS_ZSTD)
-  message(STATUS "netCDF has zstandard capability")
-  target_compile_definitions(${this} PRIVATE NF_HAS_ZSTD)
-else ()
-  message(STATUS "netCDF does not have zstandard capability")
-endif ()
+# Skip this section for GCHP
+#check_c_source_compiles("
+#  #include <netcdf_meta.h>
+#  #if !NC_HAS_ZSTD
+#  choke me
+#  #endif
+#  int main(void) {
+#    return 0;
+#  }
+#  "
+#  NETCDF_HAS_ZSTD)
+#
+## NOTE: Even if the check above succeeds, zstandard is *not*
+## possible with Baselibs (builds HDF5, netCDF as static)
+## so we want to check for Baselibs first.
+#
+#if (Baselibs_FOUND)
+#  message(STATUS "Baselibs found, zstandard capability not possible")
+#  set(NETCDF_HAS_ZSTD FALSE CACHE BOOL "netCDF has zstandard capability" FORCE)
+#endif ()
+#
+#if (NETCDF_HAS_ZSTD)
+#  message(STATUS "netCDF has zstandard capability")
+#  target_compile_definitions(${this} PRIVATE NF_HAS_ZSTD)
+#else ()
+#  message(STATUS "netCDF does not have zstandard capability")
+#endif ()
 
 # GCHP: do not include programs
 #add_subdirectory (programs)
