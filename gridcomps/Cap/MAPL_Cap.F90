@@ -582,6 +582,7 @@ contains
 
      if (.not. this%mpi_already_initialized) then
         call MPI_Barrier(this%comm_world, status)
+        call MPI_Finalize(status)
         call c_exit(0_c_int)
      end if
 
