@@ -6176,19 +6176,56 @@ ENDDO PARSER
     character (len=50), allocatable :: grid_names(:)
     character (len=50), allocatable :: sampler_type(:)
     character(len=ESMF_MAXSTR) :: HIST_CF, string
+    ! Legacy (pre-MAPL-2.59) 1-D track output: <collection>.track_file / .recycle_track
+    character(len=ESMF_MAXSTR), allocatable :: track_file(:)
+    logical, allocatable :: legacy(:)
+    integer, allocatable :: freq_hms(:)
+    logical :: recycle
+    character(len=ESMF_MAXSTR) :: coll
+    character(len=6) :: hms
+    character(len=2*ESMF_MAXSTR) :: msg
     type(ESMF_Config) :: cfg
+    type(Logger), pointer :: lgr
 
+    lgr => logging%get_logger('HISTORY.sampler')
     call ESMF_ConfigGetAttribute(config, value=HIST_CF, &
          label="HIST_CF:", default="HIST.rc", _RC )
     unitr = GETFILE(HIST_CF, FORM='formatted', _RC)
 
     allocate(sampler_type(nlist))
+    allocate(track_file(nlist))
+    allocate(legacy(nlist))
+    allocate(freq_hms(nlist))
+    legacy = .false.
+    freq_hms = 240000
     do n = 1, nlist
        cfg = ESMF_ConfigCreate(_RC)
        string = trim( list(n)%collection ) // '.'
        call ESMF_ConfigLoadFile(cfg, filename = trim(string)//'rcx', _RC)
        call ESMF_ConfigGetAttribute ( cfg, value=sampler_type(n), default="", &
             label=trim(string) // 'sampler_type:' ,_RC )
+       call ESMF_ConfigGetAttribute ( cfg, value=track_file(n), default="", &
+            label=trim(string) // 'track_file:' ,_RC )
+       if (trim(track_file(n)) /= '' .and. trim(sampler_type(n)) == '') then
+          ! Translate the legacy keywords into a trajectory-sampler configuration.
+          ! See https://github.com/geoschem/GCHP/issues/564
+          call ESMF_ConfigGetAttribute ( cfg, value=recycle, default=.false., &
+               label=trim(string) // 'recycle_track:' ,_RC )
+          if (recycle) then
+             msg = 'HISTORY collection '//trim(list(n)%collection)// &
+                   ': recycle_track is not supported by the MAPL trajectory sampler. '// &
+                   'Provide a track file covering the simulation period, or use '// &
+                   'file_name_template with date tokens. See the GCHP documentation on output along a track.'
+             _FAIL(trim(msg))
+          end if
+          sampler_type(n) = 'trajectory'
+          legacy(n) = .true.
+          ! Output (Epoch) interval: the legacy collection's frequency, default daily
+          call ESMF_ConfigGetAttribute ( cfg, value=freq_hms(n), default=240000, &
+               label=trim(string) // 'frequency:' ,_RC )
+          call lgr%warning('%a %a %a', 'HISTORY collection', trim(list(n)%collection), &
+               'uses the legacy track_file keyword; translated to the MAPL trajectory sampler')
+       end if
        call ESMF_ConfigDestroy(cfg, _RC)
     end do
 
@@ -6197,11 +6234,50 @@ ENDDO PARSER
        if (sampler_type(n) == 'trajectory') then
           rewind(unitr)
           string = trim( list(n)%collection ) // '.'
+          coll = trim( list(n)%collection )
           unitw = GETFILE(trim(string)//'rcx', FORM='formatted', _RC)
           call scan_write_between_line1_line2_flush_Left (unitr, unitw,  string, '::')
+
+          if (legacy(n)) then
+             ! Collection keywords expected by the trajectory sampler
+             write(hms, '(i6.6)') freq_hms(n)
+             write(unitw, '(a)') trim(string)//'sampler_type: trajectory'
+             write(unitw, '(a)') trim(string)//'grid_label: '//trim(coll)//'_track'
+             write(unitw, '(a)') trim(string)//'Epoch: '//hms
+             write(unitw, '(a)') trim(string)//'use_NWP_1_file: .true.'
+             write(unitw, '(a)') trim(string)//'restore_2_obs_vector: .true.'
+             write(unitw, '(a)') trim(string)//"output_leading_dim: 'lev'"
+             ! Synthesized grid and schema labels
+             write(unitw, '(a)') 'GRID_LABELS:'
+             write(unitw, '(a)') '    '//trim(coll)//'_track'
+             write(unitw, '(a)') '    '//trim(coll)//'_schema'
+             write(unitw, '(a)') '::'
+             write(unitw, '(a)') trim(coll)//'_track.GRID_TYPE: Trajectory'
+             write(unitw, '(a)') trim(coll)//'_track.schema: '//trim(coll)//'_schema'
+             write(unitw, '(a)') trim(coll)//'_track.file_name_template: '//trim(track_file(n))
+             write(unitw, '(a)') trim(coll)//'_schema.GRID_TYPE: Trajectory'
+             write(unitw, '(a)') trim(coll)//'_schema.index: time'
+             write(unitw, '(a)') trim(coll)//'_schema.lon: longitude'
+             write(unitw, '(a)') trim(coll)//'_schema.lat: latitude'
+             write(unitw, '(a)') trim(coll)//'_schema.time: time'
+             write(unitw, '(a)') trim(coll)//"_schema.frequency: '000000 "//hms//"'"
+             write(unitw, *)
+             call free_file(unitw, _RC)
+             cycle
+          end if
+
           call scan_write_between_line1_line2_flush_Left (unitr, unitw,  'GRID_LABELS:', '::')
+
+          ! Collect grid labels: any label on the GRID_LABELS: line itself,
+          ! plus one per continuation line up to the closing '::'
           call scan_begin (unitr, 'GRID_LABELS:', .true.)
-          ios=0; i=0; j=0   ! i: count
+          backspace(unitr)
+          read (unitr, '(a300)', iostat = ios) line
+          i = 0
+          if (ios == 0) then
+             if (len_trim(first_line_label(line)) > 0) i = i + 1
+          end if
+          ios=0; j=0
           do while (ios==0)
              read (unitr, '(a300)', iostat = ios, err = 300) line
              j=index( adjustl(line), '::' )
@@ -6212,10 +6288,18 @@ ENDDO PARSER
              end if
           end do
 300       continue
-
           allocate (grid_names(i))
           call scan_begin (unitr, 'GRID_LABELS:', .true.)
-          ios=0; i=0; j=0   ! i: count
+          backspace(unitr)
+          read (unitr, '(a300)', iostat = ios) line
+          i = 0
+          if (ios == 0) then
+             if (len_trim(first_line_label(line)) > 0) then
+                i = i + 1
+                grid_names(i) = first_line_label(line)
+             end if
+          end if
+          ios=0; j=0
           do while (ios==0)
              read (unitr, '(a300)', iostat = ios, err = 301) line
              j=index( adjustl(line), '::' )
@@ -6227,12 +6311,10 @@ ENDDO PARSER
              end if
           end do
 301       continue
-
           do j=1, i
              line=trim(grid_names(j))//'.'
              call scan_write_begin_with_line1_flush_Left (unitr, unitw, line)
           end do
-
           call scan_write_between_line1_line2_flush_Left (unitr, unitw, 'Trajectory_Schema::', '::')
           call scan_write_begin_with_line1_flush_Left (unitr, unitw, 'schema_version')
           call free_file(unitw, _RC)
@@ -6242,6 +6324,27 @@ ENDDO PARSER
     call free_file(unitr, _RC)
 
     _RETURN(ESMF_SUCCESS)
+
+  contains
+
+    function first_line_label(line) result(label)
+      ! Returns a grid label written on the "GRID_LABELS:" line itself
+      ! (ignoring comments), or an empty string.
+      character(len=*), intent(in) :: line
+      character(len=50) :: label
+      character(len=300) :: rest
+      integer :: p, q
+      label = ''
+      p = index(line, 'GRID_LABELS:')
+      if (p == 0) return
+      rest = adjustl(line(p+len('GRID_LABELS:'):))
+      q = index(rest, '#')
+      if (q > 0) rest = rest(1:q-1)
+      q = index(trim(rest), ' ')
+      if (q > 0) rest = rest(1:q-1)
+      label = trim(adjustl(rest))
+    end function first_line_label
+
   end subroutine regen_rcx_for_schema_version_1
 
   end module MAPL_HistoryGridCompMod

@@ -8,10 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Trajectory sampler now stops with an explicit error when the track/observation file's time unit is not `seconds since`, instead of sampling at the wrong times or failing in `MPI_Scatterv` (the epoch bracketing assumes seconds)
+- Fixed History reading `GRID_LABELS` only from continuation lines; a label on the `GRID_LABELS:` line itself is now accepted
 - Fixed compiler bug encountered with certain versions of Intel compilers
 - Fixed bug when one of the two names in an ExtData2G rule for a vector is contained in a substring in another item, for example UA;VA and EVAP 
 
 ### Added
+- Added backward compatibility for the pre-MAPL-2.59 1-D track output keywords `track_file`/`recycle_track` in HISTORY.rc: History now translates them into a trajectory-sampler configuration (`recycle_track: .true.` stops with an explicit error). See https://github.com/geoschem/GCHP/issues/564
+- Added `obs_frequency` as an accepted alias of the trajectory-sampler schema keyword `frequency` (renamed in MAPL 2.60)
 - Add debug logger call to print out the name of the container being read from `ExtData.rc`
 - Added dimensionless vertical coordinates to criteria for vertically flipping imports in ExtData
 - Added ExtData2G criteria for presence of vertical coordinate for cases of non-CF-compliant files
