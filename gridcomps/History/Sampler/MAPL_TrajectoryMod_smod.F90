@@ -148,7 +148,12 @@ submodule (HistoryTrajectoryMod)  HistoryTrajectory_implement
          end if
          call ESMF_ConfigGetAttribute(config, value=STR1, default="", &
               label=trim(STR_KW)//'frequency:', _RC)
-         _ASSERT(STR1/='', 'fatal error: frequency not provided in RC file')
+         if (trim(STR1) == '') then
+            ! Accept the pre-MAPL-2.60 keyword as an alias (GCHP 14.7.1 configs)
+            call ESMF_ConfigGetAttribute(config, value=STR1, default="", &
+                 label=trim(STR_KW) // 'obs_frequency:', _RC)
+         end if
+         _ASSERT(STR1/='', 'fatal error: frequency (or obs_frequency) not provided in RC file for schema '//trim(STR_KW))
 
          if (mapl_am_I_root()) write(6,105) 'frequency [obs_file_interval]:', trim(STR1)
          if (mapl_am_I_root()) write(6,106) 'Epoch (second)   :', second
@@ -289,7 +294,12 @@ submodule (HistoryTrajectoryMod)  HistoryTrajectory_implement
 
          call ESMF_ConfigGetAttribute(config, value=STR1, default="", &
               label=trim(STR_KW) // 'frequency:', _RC)
-         _ASSERT(STR1/='', 'fatal error: frequency not provided in RC file')
+         if (trim(STR1) == '') then
+            ! Accept the pre-MAPL-2.60 keyword as an alias (GCHP 14.7.1 configs)
+            call ESMF_ConfigGetAttribute(config, value=STR1, default="", &
+                 label=trim(STR_KW) // 'obs_frequency:', _RC)
+         end if
+         _ASSERT(STR1/='', 'fatal error: frequency (or obs_frequency) not provided in RC file for schema '//trim(STR_KW))
          if (mapl_am_I_root()) write(6,105) 'frequency [obs_file_interval]:', trim(STR1)
          if (mapl_am_I_root()) write(6,106) 'Epoch (second)   :', second
 
@@ -967,6 +977,13 @@ submodule (HistoryTrajectoryMod)  HistoryTrajectory_implement
             return
          end if
          call MAPL_CommsBcast(vm, this%datetime_units, N=ESMF_MAXSTR, ROOT=MAPL_Root, _RC)
+         ! The epoch bracketing below works in integer seconds (time_esmf_2_nc_int
+         ! assumes the file unit is seconds), so a track file whose time unit is
+         ! hours/minutes/days is sampled at the wrong times or fails in MPI_Scatterv.
+         ! Stop with a clear message instead.  See https://github.com/geoschem/GCHP/issues/564
+         if (index(adjustl(this%datetime_units), 'seconds since') /= 1) then
+            _FAIL('Trajectory sampler: time units of the track/observation file must be "seconds since <date>", found "'//trim(this%datetime_units)//'". Convert the time variable (e.g. ncap2 -s "time=time*3600.f" + ncatted -a units,time,o,c,"seconds since ...") and rerun.')
+         end if
 
 
          if (mapl_am_I_root()) then
